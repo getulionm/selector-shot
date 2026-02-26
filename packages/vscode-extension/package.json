@@ -1,0 +1,71 @@
+{
+    "name": "selector-shot-vscode-extension",
+    "displayName": "Selector Shot",
+    "description": "Show selector screenshots on CodeLens",
+    "version": "0.0.1",
+    "publisher": "local",
+    "engines": {
+        "vscode": "^1.90.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onStartupFinished",
+        "onCommand:selectorShot.refresh",
+        "onCommand:selectorShot.openImage"
+    ],
+    "main": "./dist/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "selectorShot.refresh",
+                "title": "Selector Shot: Refresh Index"
+            },
+            {
+                "command": "selectorShot.openImage",
+                "title": "Selector Shot: Open Screenshot"
+            }
+        ],
+        "configuration": {
+            "title": "Selector Shot",
+            "properties": {
+                "selectorShot.dataGlob": {
+                    "type": "string",
+                    "default": ".selector-shot/**/*.json",
+                    "description": "Glob used to discover selector-shot metadata files."
+                },
+                "selectorShot.onlyCaptured": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Prefer CodeLens for successfully captured screenshots; if none exist for a line, fall back to the latest available record."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "build": "node ./scripts/build.mjs",
+        "watch": "node ./scripts/build.mjs --watch",
+        "package": "npm run build \u0026\u0026 npx @vscode/vsce package --no-dependencies",
+        "test:integration": "npm run build \u0026\u0026 node ./test/run-integration.js",
+        "test:unit": "npm run build \u0026\u0026 node --test ./test/unit/*.test.js"
+    },
+    "devDependencies": {
+        "@types/node": "^20.12.12",
+        "@types/vscode": "^1.90.0",
+        "esbuild": "^0.25.0",
+        "typescript": "^5.8.2",
+        "@vscode/test-electron": "^2.4.1"
+    },
+    "files": [
+        "dist/**",
+        "package.json",
+        "README.md",
+        "LICENSE"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/getulionm/selector-shot.git",
+        "directory": "packages/vscode-extension"
+    }
+}

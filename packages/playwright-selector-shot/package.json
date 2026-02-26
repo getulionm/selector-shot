@@ -1,0 +1,14 @@
+{
+    "name":  "@selector-shot/playwright",
+    "version":  "0.0.1",
+    "description":  "POC Playwright selector screenshot tracker",
+    "main":  "index.js",
+    "types":  "index.d.ts",
+    "scripts":  {
+                    "test":  "node --test test/*.test.js"
+                },
+    "license":  "MIT",
+    "bin":  {
+                "selector-shot-update":  "bin/selector-shot-update.js"
+            }
+}
