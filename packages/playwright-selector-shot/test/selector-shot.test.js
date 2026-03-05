@@ -278,3 +278,50 @@ test("selectorShot captures before click when locator disappears after navigatio
   assert.equal(meta.status, "captured");
   assert.equal(meta.selector, "#signup");
 });
+
+test("selectorShot can capture locator assertions via _expect when enabled", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  const hooks = selectorShot({
+    outDir,
+    selectorMarker: "selector-shot.test.js",
+    captureStrategy: "onUse",
+    captureAssertions: true
+  });
+
+  const page = {
+    locator(selector) {
+      return {
+        async _expect() {
+          return { matches: true };
+        },
+        first() {
+          return {
+            async waitFor() { },
+            async scrollIntoViewIfNeeded() { },
+            async screenshot({ path: imagePath }) {
+              fs.writeFileSync(imagePath, `mock image for ${selector}`, "utf8");
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const testInfo = {
+    title: "captures assertions",
+    project: { name: "chromium" }
+  };
+
+  await hooks.beforeEach({ page }, testInfo);
+  await page.locator("#assertion-target")._expect("to.be.visible");
+  await hooks.afterEach({ page }, testInfo);
+
+  const allFiles = fs.readdirSync(outDir, { recursive: true });
+  const jsonFiles = allFiles.filter((name) => String(name).endsWith(".json"));
+  assert.equal(jsonFiles.length, 1);
+
+  const jsonPath = path.join(outDir, jsonFiles[0]);
+  const meta = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+  assert.equal(meta.status, "captured");
+  assert.equal(meta.selector, "#assertion-target");
+});

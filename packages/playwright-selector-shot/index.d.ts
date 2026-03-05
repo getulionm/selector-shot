@@ -10,6 +10,7 @@ export type SelectorShotOptions = {
   maxAfterEachMs?: number;
   skipMissingSelectors?: boolean;
   missingSelectorTimeoutMs?: number;
+  captureAssertions?: boolean;
   debugCapture?: boolean;
   debugConsole?: boolean;
 };

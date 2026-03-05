@@ -16,8 +16,7 @@
         "onCommand:selectorShot.refresh",
         "onCommand:selectorShot.openImage",
         "onCommand:selectorShot.enable",
-        "onCommand:selectorShot.disable",
-        "onCommand:selectorShot.toggleEnabled"
+        "onCommand:selectorShot.disable"
     ],
     "main": "./dist/extension.js",
     "contributes": {
@@ -41,10 +40,6 @@
             {
                 "command": "selectorShot.disable",
                 "title": "Selector Shot: Disable"
-            },
-            {
-                "command": "selectorShot.toggleEnabled",
-                "title": "Selector Shot: Toggle Enabled"
             }
         ],
         "configuration": {

@@ -1,77 +1,65 @@
 # selector-shot (POC)
 
-POC for this workflow:
+`selector-shot` is a VS Code extension that brings visibility to your Playwright selectors.
 
-1. Run Playwright tests.
-2. Capture screenshots for selectors used via `page.locator(...)`.
-3. Show an `Open selector screenshot` CodeLens on the selector line in VS Code.
+It shows selector screenshots directly in source files via CodeLens, so you can understand what each selector matched during test execution.
 
-## What is included
+Under the hood, this repo also includes a helper package used by client test runs to capture selector metadata and images.
+
+## This repo contains
 
 - `packages/playwright-selector-shot`
-  - Monkey-patches `page.locator(...)` during tests.
-  - Records selector + source file/line.
-  - Captures screenshot after each test and writes metadata to `.selector-shot/**`.
+  - npm package: `@selector-shot/playwright`
+  - records `page.locator(...)` callsite metadata
+  - captures screenshots and writes `.selector-shot/**/*.json`
 - `packages/vscode-extension`
-  - Reads `.selector-shot/**/*.json`.
-  - Adds CodeLens to matching source lines.
-  - Opens screenshot when clicked.
+  - VS Code extension package (`.vsix`)
+  - reads `.selector-shot` metadata
+  - shows `Open selector screenshot` CodeLens
 
-## Quick start
+## Client install and usage
 
-1. Install deps:
-```bash
-npm install
-```
+In a client Playwright repo:
 
-Run tests in two modes:
+1. Install the extension (VSIX or Marketplace).
+2. Run command: `Selector Shot: Setup Project`.
+3. Run capture mode:
 
-Fast tests (no capture):
-```bash
-npm test
-```
-
-Capture tests (writes `.selector-shot` for extension):
-```bash
-npm run test:capture
-```
-
-2. Install extension and run `Selector Shot: Enable` in your client workspace.
-   - This auto-wires fixture/setup/import/script changes for you.
-   - Use `Selector Shot: Setup Project` to rerun wiring on demand.
-
-3. Run capture mode without changing test imports:
 ```bash
 npx selector-shot-update
 ```
 
 If your test command is custom:
+
 ```bash
 npx selector-shot-update npm run test:e2e
 ```
 
-Run unit tests for the playwright package only:
+Extension-specific install details and commands are documented in:
+- [packages/vscode-extension/README.md](/c:/Users/getul/Documents/Projects/selector-shot/packages/vscode-extension/README.md)
+
+## Develop in this repo
+
+Install workspace deps:
+
 ```bash
-npm run test:unit
+npm install
 ```
 
-4. Build extension:
+Build extension bundle:
+
 ```bash
 npm run build
 ```
 
-5. Open `packages/vscode-extension` in VS Code and run extension host:
-    - Press `F5` in extension project.
-    - In the extension host, open your test file.
-    - Run command: `Selector Shot: Refresh Index`.
-    - You should see `Open selector screenshot` above lines with `page.locator(...)`.
+Package extension VSIX:
 
-Manual wiring is still supported, but enable-bootstrap is the recommended path.
+```bash
+npm -w selector-shot-vscode-extension run package
+```
 
-## Notes and limits (POC scope)
+Run Playwright package unit tests:
 
-- Tracks only `page.locator(...)` right now.
-- Screenshot is taken after test run (using final DOM state).
-- If selector is not visible/available, metadata is still written with `status: "failed"`.
-- Extension default is to show only `captured` entries (`selectorShot.onlyCaptured = true`).
-- You can temporarily disable extension indexing via `selectorShot.enabled = false` (or command: `Selector Shot: Toggle Enabled`).
+```bash
+npm run test:unit
+```

@@ -176,6 +176,7 @@ function selectorShot(options = {}) {
   const maxAfterEachMs = readPositiveInt(options.maxAfterEachMs, 8000);
   const skipMissingSelectors = readBool(options.skipMissingSelectors, true);
   const missingSelectorTimeoutMs = readPositiveInt(options.missingSelectorTimeoutMs, 300);
+  const captureAssertions = readBool(options.captureAssertions, false);
   const debugCapture = readBool(options.debugCapture, false) || readBool(process.env.SELECTOR_SHOT_DEBUG, false);
   const debugConsole = readBool(options.debugConsole, false) || readBool(process.env.SELECTOR_SHOT_DEBUG_CONSOLE, false);
 
@@ -253,6 +254,9 @@ function selectorShot(options = {}) {
       "hover",
       "dragTo"
     ]);
+    if (state.captureAssertions && typeof locator._expect === "function") {
+      checkpointMethods.add("_expect");
+    }
     const captureBeforeMethods = new Set([
       "click",
       "dblclick",
@@ -323,7 +327,8 @@ function selectorShot(options = {}) {
           retryDelayMs,
           maxAfterEachMs,
           skipMissingSelectors,
-          missingSelectorTimeoutMs
+          missingSelectorTimeoutMs,
+          captureAssertions
         },
         dedupedSelectors: 0,
         capturedSelectors: 0,
@@ -374,6 +379,7 @@ function selectorShot(options = {}) {
         maxAfterEachMs,
         skipMissingSelectors,
         missingSelectorTimeoutMs,
+        captureAssertions,
         debugCapture,
         debugConsole
       };

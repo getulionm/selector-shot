@@ -339,6 +339,7 @@ function patchCustomFixtureFile(contents: string): string {
     ensureOption("captureStrategy", "\"onUse\"");
     ensureOption("skipMissingSelectors", "true");
     ensureOption("missingSelectorTimeoutMs", "1200");
+    ensureOption("captureAssertions", "true");
 
     const replacement = `installSelectorShot(test, {\n${optionsBlock}\n  });`;
     updated = updated.replace(installCallRegex, replacement);
@@ -362,7 +363,8 @@ function patchCustomFixtureFile(contents: string): string {
     "    maxAfterEachMs: 8000,\n" +
     "    captureStrategy: \"onUse\",\n" +
     "    skipMissingSelectors: true,\n" +
-    "    missingSelectorTimeoutMs: 1200\n" +
+    "    missingSelectorTimeoutMs: 1200,\n" +
+    "    captureAssertions: true\n" +
     "  });\n" +
     "}";
 
@@ -545,7 +547,8 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
         "    maxAfterEachMs: 8000,\n" +
         "    captureStrategy: \"onUse\",\n" +
         "    skipMissingSelectors: true,\n" +
-        "    missingSelectorTimeoutMs: 1200\n" +
+        "    missingSelectorTimeoutMs: 1200,\n" +
+        "    captureAssertions: true\n" +
         "  });\n" +
         "}\n\n" +
         "export { test };\n";
@@ -653,16 +656,6 @@ export function activate(context: vscode.ExtensionContext) {
         .update("enabled", false, vscode.ConfigurationTarget.Workspace);
       await provider.refreshIndex();
       vscode.window.showInformationMessage("Selector Shot disabled for this workspace.");
-    }),
-    vscode.commands.registerCommand("selectorShot.toggleEnabled", async () => {
-      const config = vscode.workspace.getConfiguration("selectorShot");
-      const enabled = config.get<boolean>("enabled", true);
-      const nextEnabled = !enabled;
-      await config.update("enabled", nextEnabled, vscode.ConfigurationTarget.Workspace);
-      await provider.refreshIndex();
-      vscode.window.showInformationMessage(
-        nextEnabled ? "Selector Shot enabled for this workspace." : "Selector Shot disabled for this workspace."
-      );
     }),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("selectorShot.enabled")) {

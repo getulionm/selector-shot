@@ -15,22 +15,12 @@ npm -w selector-shot-vscode-extension run package
 2. In VS Code: Extensions -> `...` -> `Install from VSIX...`
 3. Select `packages/vscode-extension/selector-shot-vscode-extension-0.0.1.vsix`
 
-## One-Click Enable (Recommended)
+## Client Setup (Recommended)
 
-After installing the extension, run `Selector Shot: Enable`.
-
-The command now attempts workspace bootstrap automatically:
-- enables Selector Shot in workspace settings
-- installs `@selector-shot/playwright` as a dev dependency when missing
-- auto-wires existing custom Playwright fixture files imported by specs (`base.extend(...)`)
-- creates `tests/setup.selector-shot.ts` (or `.js` if no TypeScript specs are found)
-- updates spec imports to use the setup file for `test`
-- adds `test:selector-shot-update` script to `package.json` if missing
-
-If you want to rerun wiring explicitly without toggling enable state, run:
-`Selector Shot: Setup Project`
-
-Then run:
+In the client repo:
+1. Install this extension from VSIX (or Marketplace).
+2. Run command: `Selector Shot: Setup Project`
+3. Run:
 ```bash
 npx selector-shot-update
 ```
@@ -40,7 +30,14 @@ If your test command is not `npm test`, pass it explicitly:
 npx selector-shot-update npm run test:e2e
 ```
 
-Note: Playwright does not allow global hook registration from process preload in all contexts, so setup wiring remains the reliable runtime path.
+`Selector Shot: Setup Project` performs bootstrap automatically:
+- installs `@selector-shot/playwright` as a dev dependency when missing
+- auto-wires existing custom Playwright fixture files imported by specs (`base.extend(...)`)
+- creates `tests/setup.selector-shot.ts` (or `.js` if no TypeScript specs are found)
+- updates spec imports to use the setup file for `test`
+- adds `test:selector-shot-update` script to `package.json` if missing
+
+`Selector Shot: Enable` remains available as a workspace toggle.
 
 ## Monorepo Note
 
@@ -54,7 +51,6 @@ If metadata is at repo root but your workspace is a package folder, set:
 - `Selector Shot: Setup Project`
 - `Selector Shot: Enable`
 - `Selector Shot: Disable`
-- `Selector Shot: Toggle Enabled`
 
 The extension also auto-refreshes when selector-shot metadata files change, and when VS Code regains focus or active editor changes.
 
