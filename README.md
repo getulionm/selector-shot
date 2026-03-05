@@ -36,32 +36,18 @@ Capture tests (writes `.selector-shot` for extension):
 npm run test:capture
 ```
 
-2. In your Playwright test setup, wire the tracker only when capture mode is enabled:
-```ts
-// tests/setup.selector-shot.ts
-import { test } from "@playwright/test";
-import { installSelectorShot } from "@selector-shot/playwright";
+2. Install extension and run `Selector Shot: Enable` in your client workspace.
+   - This auto-wires fixture/setup/import/script changes for you.
+   - Use `Selector Shot: Setup Project` to rerun wiring on demand.
 
-if (process.env.SELECTOR_SHOT_CAPTURE === "1") {
-  installSelectorShot(test, {
-    outDir: ".selector-shot",
-    maxPerTest: 60
-  });
-}
-
-export { test };
+3. Run capture mode without changing test imports:
+```bash
+npx selector-shot-update
 ```
 
-3. Use that exported `test` in specs:
-```ts
-import { expect } from "@playwright/test";
-import { test } from "./setup.selector-shot";
-
-test("login", async ({ page }) => {
-  await page.goto("https://example.com");
-  await page.locator("text=More information").click();
-  await expect(page.locator("h1")).toBeVisible();
-});
+If your test command is custom:
+```bash
+npx selector-shot-update npm run test:e2e
 ```
 
 Run unit tests for the playwright package only:
@@ -75,10 +61,12 @@ npm run build
 ```
 
 5. Open `packages/vscode-extension` in VS Code and run extension host:
-   - Press `F5` in extension project.
-   - In the extension host, open your test file.
-   - Run command: `Selector Shot: Refresh Index`.
-   - You should see `Open selector screenshot` above lines with `page.locator(...)`.
+    - Press `F5` in extension project.
+    - In the extension host, open your test file.
+    - Run command: `Selector Shot: Refresh Index`.
+    - You should see `Open selector screenshot` above lines with `page.locator(...)`.
+
+Manual wiring is still supported, but enable-bootstrap is the recommended path.
 
 ## Notes and limits (POC scope)
 
@@ -86,3 +74,4 @@ npm run build
 - Screenshot is taken after test run (using final DOM state).
 - If selector is not visible/available, metadata is still written with `status: "failed"`.
 - Extension default is to show only `captured` entries (`selectorShot.onlyCaptured = true`).
+- You can temporarily disable extension indexing via `selectorShot.enabled = false` (or command: `Selector Shot: Toggle Enabled`).

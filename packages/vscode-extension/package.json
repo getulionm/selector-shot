@@ -12,12 +12,20 @@
     ],
     "activationEvents": [
         "onStartupFinished",
+        "onCommand:selectorShot.setup",
         "onCommand:selectorShot.refresh",
-        "onCommand:selectorShot.openImage"
+        "onCommand:selectorShot.openImage",
+        "onCommand:selectorShot.enable",
+        "onCommand:selectorShot.disable",
+        "onCommand:selectorShot.toggleEnabled"
     ],
     "main": "./dist/extension.js",
     "contributes": {
         "commands": [
+            {
+                "command": "selectorShot.setup",
+                "title": "Selector Shot: Setup Project"
+            },
             {
                 "command": "selectorShot.refresh",
                 "title": "Selector Shot: Refresh Index"
@@ -25,6 +33,18 @@
             {
                 "command": "selectorShot.openImage",
                 "title": "Selector Shot: Open Screenshot"
+            },
+            {
+                "command": "selectorShot.enable",
+                "title": "Selector Shot: Enable"
+            },
+            {
+                "command": "selectorShot.disable",
+                "title": "Selector Shot: Disable"
+            },
+            {
+                "command": "selectorShot.toggleEnabled",
+                "title": "Selector Shot: Toggle Enabled"
             }
         ],
         "configuration": {
@@ -39,6 +59,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Prefer CodeLens for successfully captured screenshots; if none exist for a line, fall back to the latest available record."
+                },
+                "selectorShot.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable Selector Shot CodeLens features for the current workspace."
                 }
             }
         }
@@ -46,9 +71,9 @@
     "scripts": {
         "build": "node ./scripts/build.mjs",
         "watch": "node ./scripts/build.mjs --watch",
-        "package": "npm run build \u0026\u0026 npx @vscode/vsce package --no-dependencies",
-        "test:integration": "npm run build \u0026\u0026 node ./test/run-integration.js",
-        "test:unit": "npm run build \u0026\u0026 node --test ./test/unit/*.test.js"
+        "package": "npm run build && npx @vscode/vsce package --no-dependencies",
+        "test:integration": "npm run build && node ./test/run-integration.js",
+        "test:unit": "npm run build && node --test ./test/unit/*.test.js"
     },
     "devDependencies": {
         "@types/node": "^20.12.12",

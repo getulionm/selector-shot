@@ -245,6 +245,43 @@ async function testSelectorVariableShowsLens(workspaceRoot, sourcePath, sourceUr
   );
 }
 
+
+async function testDisableHidesLenses(workspaceRoot, sourcePath, sourceUri) {
+  const disabledImage = await writeShot(
+    workspaceRoot,
+    "integration-run-disabled-toggle",
+    sourcePath,
+    "#toggle",
+    "2026-02-26T00:00:07.000Z",
+    "captured",
+    SOURCE_LINE
+  );
+
+  await vscode.commands.executeCommand("selectorShot.disable");
+  await vscode.commands.executeCommand("selectorShot.refresh");
+
+  await waitFor(async () => {
+    const current = await readCodeLens(sourceUri);
+    return hasLensForImage(current, disabledImage) ? null : true;
+  });
+
+  const disabledLenses = await readCodeLens(sourceUri);
+  assert.equal(
+    hasLensForImage(disabledLenses, disabledImage),
+    false,
+    "Expected no CodeLens while Selector Shot is disabled."
+  );
+
+  await vscode.commands.executeCommand("selectorShot.enable");
+
+  const reenabled = await waitFor(async () => {
+    const current = await readCodeLens(sourceUri);
+    return hasLensForImage(current, disabledImage) ? current : null;
+  });
+
+  assert.ok(hasLensForImage(reenabled, disabledImage), "Expected CodeLens to return after re-enabling Selector Shot.");
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(folder, "Expected test workspace to be open.");
@@ -266,6 +303,7 @@ async function run() {
   await testSelectorMemberReferenceShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testStringLiteralSelectorShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testSelectorVariableShowsLens(workspaceRoot, sourcePath, sourceUri);
+  await testDisableHidesLenses(workspaceRoot, sourcePath, sourceUri);
 }
 
 module.exports = { run };

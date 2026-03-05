@@ -15,47 +15,32 @@ npm -w selector-shot-vscode-extension run package
 2. In VS Code: Extensions -> `...` -> `Install from VSIX...`
 3. Select `packages/vscode-extension/selector-shot-vscode-extension-0.0.1.vsix`
 
-## Quickstart
+## One-Click Enable (Recommended)
 
-1. Install dependencies in client repo:
+After installing the extension, run `Selector Shot: Enable`.
+
+The command now attempts workspace bootstrap automatically:
+- enables Selector Shot in workspace settings
+- installs `@selector-shot/playwright` as a dev dependency when missing
+- auto-wires existing custom Playwright fixture files imported by specs (`base.extend(...)`)
+- creates `tests/setup.selector-shot.ts` (or `.js` if no TypeScript specs are found)
+- updates spec imports to use the setup file for `test`
+- adds `test:selector-shot-update` script to `package.json` if missing
+
+If you want to rerun wiring explicitly without toggling enable state, run:
+`Selector Shot: Setup Project`
+
+Then run:
 ```bash
-npm install -D @playwright/test @selector-shot/playwright
-```
-2. Create `tests/setup.selector-shot.ts`:
-```ts
-import { test } from "@playwright/test";
-import { installSelectorShot } from "@selector-shot/playwright";
-
-if (process.env.SELECTOR_SHOT_CAPTURE === "1") {
-  installSelectorShot(test, {
-    outDir: ".selector-shot",
-    maxPerTest: 60,
-    captureTimeoutMs: 7000,
-    captureRetries: 2
-  });
-}
-
-export { test };
+npx selector-shot-update
 ```
 
-`installSelectorShot` resilience options:
-- `captureTimeoutMs` (default: `5000`)
-- `preCaptureWaitMs` (default: `2000`)
-- `captureRetries` (default: `2`)
-- `retryDelayMs` (default: `200`)
-3. Add script:
-```json
-{
-  "scripts": {
-    "test:selector-shot-update": "selector-shot-update"
-  }
-}
-```
-4. Run capture:
+If your test command is not `npm test`, pass it explicitly:
 ```bash
-npm run test:selector-shot-update
+npx selector-shot-update npm run test:e2e
 ```
-5. Open spec file in VS Code and run `Selector Shot: Refresh Index` once.
+
+Note: Playwright does not allow global hook registration from process preload in all contexts, so setup wiring remains the reliable runtime path.
 
 ## Monorepo Note
 
@@ -66,11 +51,17 @@ If metadata is at repo root but your workspace is a package folder, set:
 
 - `Selector Shot: Refresh Index`
 - `Selector Shot: Open Screenshot`
+- `Selector Shot: Setup Project`
+- `Selector Shot: Enable`
+- `Selector Shot: Disable`
+- `Selector Shot: Toggle Enabled`
 
 The extension also auto-refreshes when selector-shot metadata files change, and when VS Code regains focus or active editor changes.
 
 ## Settings
 
+- `selectorShot.enabled` (default: `true`)
+  - master toggle for CodeLens indexing and display in this workspace
 - `selectorShot.dataGlob` (default: `.selector-shot/**/*.json`)
 - `selectorShot.onlyCaptured` (default: `true`)
   - prefers `captured`

@@ -224,3 +224,57 @@ test("selectorShot can capture on locator usage before afterEach", async () => {
   assert.equal(meta.status, "captured");
   assert.equal(meta.selector, "text=Capture on use");
 });
+
+test("selectorShot captures before click when locator disappears after navigation", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  const hooks = selectorShot({
+    outDir,
+    selectorMarker: "selector-shot.test.js",
+    captureStrategy: "onUse",
+    missingSelectorTimeoutMs: 1,
+    preCaptureWaitMs: 1,
+    captureTimeoutMs: 10
+  });
+
+  let navigated = false;
+  const page = {
+    locator(selector) {
+      return {
+        async click() {
+          navigated = true;
+        },
+        first() {
+          return {
+            async waitFor() {
+              if (navigated) {
+                throw new Error("selector missing after navigation");
+              }
+            },
+            async scrollIntoViewIfNeeded() { },
+            async screenshot({ path: imagePath }) {
+              fs.writeFileSync(imagePath, `mock image for ${selector}`, "utf8");
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const testInfo = {
+    title: "captures before click navigation",
+    project: { name: "chromium" }
+  };
+
+  await hooks.beforeEach({ page }, testInfo);
+  await page.locator("#signup").click();
+  await hooks.afterEach({ page }, testInfo);
+
+  const allFiles = fs.readdirSync(outDir, { recursive: true });
+  const jsonFiles = allFiles.filter((name) => String(name).endsWith(".json"));
+  assert.equal(jsonFiles.length, 1);
+
+  const jsonPath = path.join(outDir, jsonFiles[0]);
+  const meta = JSON.parse(fs.readFileSync(jsonPath, "utf8"));
+  assert.equal(meta.status, "captured");
+  assert.equal(meta.selector, "#signup");
+});

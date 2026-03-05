@@ -169,11 +169,11 @@ function selectorShot(options = {}) {
   const selectorMarker = options.selectorMarker || ".locator (";
   const maxPerTest = options.maxPerTest || 50;
   const captureStrategy = readCaptureStrategy(options.captureStrategy, "afterEach");
-  const captureTimeoutMs = readPositiveInt(options.captureTimeoutMs, 5000);
-  const preCaptureWaitMs = readPositiveInt(options.preCaptureWaitMs, 2000);
-  const captureRetries = readNonNegativeInt(options.captureRetries, 2);
+  const captureTimeoutMs = readPositiveInt(options.captureTimeoutMs, 2500);
+  const preCaptureWaitMs = readPositiveInt(options.preCaptureWaitMs, 750);
+  const captureRetries = readNonNegativeInt(options.captureRetries, 0);
   const retryDelayMs = readPositiveInt(options.retryDelayMs, 200);
-  const maxAfterEachMs = readPositiveInt(options.maxAfterEachMs, 30000);
+  const maxAfterEachMs = readPositiveInt(options.maxAfterEachMs, 8000);
   const skipMissingSelectors = readBool(options.skipMissingSelectors, true);
   const missingSelectorTimeoutMs = readPositiveInt(options.missingSelectorTimeoutMs, 300);
   const debugCapture = readBool(options.debugCapture, false) || readBool(process.env.SELECTOR_SHOT_DEBUG, false);
@@ -253,6 +253,17 @@ function selectorShot(options = {}) {
       "hover",
       "dragTo"
     ]);
+    const captureBeforeMethods = new Set([
+      "click",
+      "dblclick",
+      "tap",
+      "press",
+      "check",
+      "uncheck",
+      "selectOption",
+      "setInputFiles",
+      "dragTo"
+    ]);
 
     for (const method of checkpointMethods) {
       const original = locator[method];
@@ -261,18 +272,29 @@ function selectorShot(options = {}) {
       }
 
       locator[method] = function wrappedLocatorMethod(...args) {
-        const result = original.apply(locator, args);
-        const runCapture = async () => {
-          await captureRecord(state.page, state, record, state.runDir, debugReport, `onUse:${method}`);
+        const captureBeforeAction = captureBeforeMethods.has(method);
+        const runCapture = async (reasonSuffix) => {
+          await captureRecord(state.page, state, record, state.runDir, debugReport, `onUse:${method}:${reasonSuffix}`);
         };
+
+        if (captureBeforeAction) {
+          const beforeCapture = runCapture("before");
+          const callOriginal = () => original.apply(locator, args);
+          if (beforeCapture && typeof beforeCapture.then === "function") {
+            return Promise.resolve(beforeCapture).then(callOriginal);
+          }
+          return callOriginal();
+        }
+
+        const result = original.apply(locator, args);
 
         if (result && typeof result.then === "function") {
           return Promise.resolve(result).finally(async () => {
-            await runCapture();
+            await runCapture("after");
           });
         }
 
-        void runCapture();
+        void runCapture("after");
         return result;
       };
     }
