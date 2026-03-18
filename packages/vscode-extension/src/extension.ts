@@ -2,7 +2,12 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 import * as vscode from "vscode";
-import { codeLensTitleForItem, formatCaptureTime, lineContainsConcreteSelectorText } from "./logic";
+import {
+  buildSelectorShotInstallCommand,
+  codeLensTitleForItem,
+  formatCaptureTime,
+  lineContainsConcreteSelectorText
+} from "./logic";
 
 type SelectorShotMeta = {
   status?: string;
@@ -433,9 +438,12 @@ function specNeedsSetupImportPatch(contents: string): boolean {
   return names.includes("test");
 }
 
-function ensureSelectorShotDependency(workspaceRoot: string): { installed: boolean; note?: string } {
-  const command = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(command, ["install", "-D", "@getulionm/selector-shot-playwright"], {
+function ensureSelectorShotDependency(
+  workspaceRoot: string,
+  packageJson?: { packageManager?: string | undefined }
+): { installed: boolean; note?: string } {
+  const installCommand = buildSelectorShotInstallCommand(workspaceRoot, packageJson);
+  const result = spawnSync(installCommand.command, installCommand.args, {
     cwd: workspaceRoot,
     encoding: "utf8"
   });
@@ -444,11 +452,14 @@ function ensureSelectorShotDependency(workspaceRoot: string): { installed: boole
   }
   const detail = [result.stderr, result.stdout].map((s) => (s || "").trim()).filter(Boolean)[0];
   if (detail) {
-    return { installed: false, note: `Could not auto-install @getulionm/selector-shot-playwright. ${detail}` };
+    return {
+      installed: false,
+      note: `Could not auto-install @getulionm/selector-shot-playwright. ${detail} Run ${installCommand.manualCommand}.`
+    };
   }
   return {
     installed: false,
-    note: "Could not auto-install @getulionm/selector-shot-playwright. Run npm install -D @getulionm/selector-shot-playwright."
+    note: `Could not auto-install @getulionm/selector-shot-playwright. Run ${installCommand.manualCommand}.`
   };
 }
 
@@ -499,7 +510,7 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     packageJson.devDependencies?.["@getulionm/selector-shot-playwright"]
   );
   if (!hasSelectorShotDependency) {
-    const installResult = ensureSelectorShotDependency(workspaceRoot);
+    const installResult = ensureSelectorShotDependency(workspaceRoot, packageJson);
     installedDependency = installResult.installed;
     if (!installResult.installed && installResult.note) {
       notes.push(installResult.note);
