@@ -77,12 +77,6 @@
         "typescript": "^5.8.2",
         "@vscode/test-electron": "^2.4.1"
     },
-    "files": [
-        "dist/**",
-        "package.json",
-        "README.md",
-        "LICENSE"
-    ],
     "repository": {
         "type": "git",
         "url": "https://github.com/getulionm/selector-shot.git",
