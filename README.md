@@ -1,4 +1,4 @@
-# selector-shot (POC)
+# selector-shot
 
 `selector-shot` is a VS Code extension that brings visibility to your Playwright selectors.
 
@@ -22,6 +22,7 @@ Under the hood, this repo also includes a helper package used by client test run
 In a client Playwright repo:
 
 1. Install the extension (VSIX or Marketplace).
+2. Open the app or package folder you want to work in.
 2. Run command: `Selector Shot: Setup Project`.
 3. Run capture mode:
 
@@ -33,6 +34,19 @@ If your test command is custom:
 
 ```bash
 npx selector-shot-update npm run test:e2e
+```
+
+By default, Selector Shot writes capture output to `.selector-shot` in the current project folder. That same folder is also the default place the VS Code extension indexes, so the recommended workflow is:
+
+- standalone app: open the app root in VS Code and run capture there
+- monorepo package: open the package folder in VS Code and run capture there
+
+This keeps `selectorShot.dataGlob` at its default:
+
+```json
+{
+  "selectorShot.dataGlob": ".selector-shot/**/*.json"
+}
 ```
 
 Extension-specific install details and commands are documented in:
@@ -63,3 +77,12 @@ Run Playwright package unit tests:
 ```bash
 npm run test:unit
 ```
+
+Run the full local verification set before a release:
+
+```bash
+npm run test:all
+```
+
+Marketplace launch guidance and the recommended compatibility matrix live in:
+- [docs/marketplace-launch-checklist.md](/c:/Users/getul/Documents/Projects/selector-shot/docs/marketplace-launch-checklist.md)

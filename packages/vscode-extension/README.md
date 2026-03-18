@@ -19,6 +19,7 @@ npm -w selector-shot-vscode-extension run package
 
 In the client repo:
 1. Install this extension from VSIX (or Marketplace).
+2. Open the app or package folder you want to work in.
 2. Run command: `Selector Shot: Setup Project`
 3. Run:
 ```bash
@@ -39,10 +40,34 @@ npx selector-shot-update npm run test:e2e
 
 `Selector Shot: Enable` remains available as a workspace toggle.
 
-## Monorepo Note
+## Recommended Workspace Model
 
-If metadata is at repo root but your workspace is a package folder, set:
-- `selectorShot.dataGlob`: `../.selector-shot/**/*.json`
+Selector Shot works best when the folder opened in VS Code is also the folder where capture runs.
+
+Recommended default:
+
+- standalone app: open the app root
+- monorepo: open the package folder you are working in
+- run `npx selector-shot-update` from that same folder
+- keep capture output local at `.selector-shot`
+
+That means the default setting is usually enough:
+
+```json
+{
+  "selectorShot.dataGlob": ".selector-shot/**/*.json"
+}
+```
+
+## Advanced Workspace Layouts
+
+If metadata is intentionally written outside the currently opened workspace, then set `selectorShot.dataGlob` manually to match that layout.
+
+Example:
+
+- workspace opened at `packages/web-app`
+- metadata written at repo root
+- set `selectorShot.dataGlob` to `../../.selector-shot/**/*.json`
 
 ## Commands
 
@@ -73,6 +98,11 @@ No CodeLens:
 3. Wait briefly for auto-refresh, or run `Selector Shot: Refresh Index`.
 4. Verify the target source line contains a concrete selector expression (literal or member reference like `selectors.firstName`).
 5. Check `Output` -> `Log (Extension Host)` for runtime errors.
+
+`Selector Shot: Setup Project` warns that `@selector-shot/playwright` could not be auto-installed:
+1. This is expected until `@selector-shot/playwright` is published.
+2. For local testing, install the helper package manually.
+3. Re-run `npx selector-shot-update`.
 
 `Selector screenshot not found on disk`:
 1. Re-run capture mode.

@@ -5,6 +5,33 @@ const vscode = require("vscode");
 
 const SOURCE_RELATIVE_PATH = path.join("tests", "playwright", "example.spec.ts");
 const SOURCE_LINE = 7;
+const FIXTURE_CASES = {
+  tsSpec: {
+    relativePath: path.join("tests", "playwright", "example.spec.ts"),
+    snippet: "page.locator(\"a[href*='iana.org/domains/example']\")",
+    selector: "a[href*=iana]"
+  },
+  jsSpec: {
+    relativePath: path.join("tests", "playwright", "js-example.spec.js"),
+    snippet: "page.locator(\"[data-testid='hero']\")",
+    selector: "[data-testid='hero']"
+  },
+  customFixtureSpec: {
+    relativePath: path.join("tests", "playwright", "custom-fixture.spec.ts"),
+    snippet: "page.locator(\"button[data-testid='save']\")",
+    selector: "button[data-testid='save']"
+  },
+  pageObject: {
+    relativePath: path.join("src", "page-objects", "signup.ts"),
+    snippet: "page.locator(selectors.email)",
+    selector: "[data-testid='signup-email']"
+  },
+  nestedSpec: {
+    relativePath: path.join("apps", "shop", "tests", "e2e", "checkout.spec.ts"),
+    snippet: "page.locator(\"form[data-testid='checkout']\")",
+    selector: "form[data-testid='checkout']"
+  }
+};
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -282,6 +309,37 @@ async function testDisableHidesLenses(workspaceRoot, sourcePath, sourceUri) {
   assert.ok(hasLensForImage(reenabled, disabledImage), "Expected CodeLens to return after re-enabling Selector Shot.");
 }
 
+async function testCodeLensAcrossCommonPlaywrightLayouts(workspaceRoot) {
+  for (const [caseName, fixtureCase] of Object.entries(FIXTURE_CASES)) {
+    const sourcePath = path.join(workspaceRoot, fixtureCase.relativePath);
+    const sourceUri = vscode.Uri.file(sourcePath);
+    const sourceLine = await findLineNumber(sourcePath, fixtureCase.snippet);
+    const imagePath = await writeShot(
+      workspaceRoot,
+      `integration-run-${caseName}`,
+      sourcePath,
+      fixtureCase.selector,
+      `2026-02-26T00:10:0${Object.keys(FIXTURE_CASES).indexOf(caseName)}.000Z`,
+      "captured",
+      sourceLine
+    );
+
+    const doc = await vscode.workspace.openTextDocument(sourceUri);
+    await vscode.window.showTextDocument(doc);
+    await vscode.commands.executeCommand("selectorShot.refresh");
+
+    const lenses = await waitFor(async () => {
+      const current = await readCodeLens(sourceUri);
+      return hasLensForImage(current, imagePath) ? current : null;
+    });
+
+    assert.ok(
+      hasLensForImage(lenses, imagePath),
+      `Expected CodeLens for Playwright layout case "${caseName}" at ${fixtureCase.relativePath}.`
+    );
+  }
+}
+
 async function run() {
   const folder = vscode.workspace.workspaceFolders?.[0];
   assert.ok(folder, "Expected test workspace to be open.");
@@ -304,6 +362,7 @@ async function run() {
   await testStringLiteralSelectorShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testSelectorVariableShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testDisableHidesLenses(workspaceRoot, sourcePath, sourceUri);
+  await testCodeLensAcrossCommonPlaywrightLayouts(workspaceRoot);
 }
 
 module.exports = { run };

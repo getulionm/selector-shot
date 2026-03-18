@@ -325,3 +325,238 @@ test("selectorShot can capture locator assertions via _expect when enabled", asy
   assert.equal(meta.status, "captured");
   assert.equal(meta.selector, "#assertion-target");
 });
+
+test("selectorShot falls back to afterEach when captureStrategy is invalid", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  const hooks = selectorShot({
+    outDir,
+    selectorMarker: "selector-shot.test.js",
+    captureStrategy: "unsupported-mode"
+  });
+
+  let fillCalls = 0;
+  const page = {
+    locator(selector) {
+      return {
+        async fill() {
+          fillCalls += 1;
+        },
+        first() {
+          return {
+            async waitFor() { },
+            async scrollIntoViewIfNeeded() { },
+            async screenshot({ path: imagePath }) {
+              fs.writeFileSync(imagePath, `mock image for ${selector}`, "utf8");
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const testInfo = {
+    title: "invalid strategy falls back",
+    project: { name: "chromium" }
+  };
+
+  await hooks.beforeEach({ page }, testInfo);
+  await page.locator("#fallback-strategy").fill("hello");
+  const filesBeforeAfterEach = fs.readdirSync(outDir, { recursive: true }).filter((name) => String(name).endsWith(".json"));
+  assert.equal(filesBeforeAfterEach.length, 0);
+
+  await hooks.afterEach({ page }, testInfo);
+
+  const jsonFiles = fs.readdirSync(outDir, { recursive: true }).filter((name) => String(name).endsWith(".json"));
+  assert.equal(fillCalls, 1);
+  assert.equal(jsonFiles.length, 1);
+});
+
+test("selectorShot coerces string and env options for debug and retries", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  process.env.SELECTOR_SHOT_DEBUG = "1";
+
+  try {
+    const hooks = selectorShot({
+      outDir,
+      selectorMarker: "selector-shot.test.js",
+      captureRetries: "1",
+      retryDelayMs: "1",
+      skipMissingSelectors: "false",
+      debugConsole: "true"
+    });
+
+    let attachedWaits = 0;
+    let screenshotAttempts = 0;
+    const page = {
+      locator() {
+        return {
+          first() {
+            return {
+              async waitFor({ state }) {
+                if (state === "attached") {
+                  attachedWaits += 1;
+                }
+              },
+              async scrollIntoViewIfNeeded() { },
+              async screenshot() {
+                screenshotAttempts += 1;
+                if (screenshotAttempts === 1) {
+                  throw new Error("first attempt failed");
+                }
+              }
+            };
+          }
+        };
+      }
+    };
+
+    const testInfo = {
+      title: "env debug and string coercion",
+      project: { name: "chromium" }
+    };
+
+    await hooks.beforeEach({ page }, testInfo);
+    page.locator("#coerced-options");
+    await hooks.afterEach({ page }, testInfo);
+
+    const allFiles = fs.readdirSync(outDir, { recursive: true });
+    const debugFiles = allFiles.filter((name) => String(name).endsWith("_selector-shot-debug.json"));
+    assert.equal(debugFiles.length, 1);
+    assert.equal(screenshotAttempts, 2);
+    assert.equal(attachedWaits, 2);
+
+    const debugPath = path.join(outDir, debugFiles[0]);
+    const report = JSON.parse(fs.readFileSync(debugPath, "utf8"));
+    assert.equal(report.options.captureRetries, 1);
+    assert.equal(report.options.retryDelayMs, 1);
+    assert.equal(report.options.skipMissingSelectors, false);
+  } finally {
+    delete process.env.SELECTOR_SHOT_DEBUG;
+  }
+});
+
+test("selectorShot enforces maxPerTest after deduping callsites", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  const hooks = selectorShot({
+    outDir,
+    selectorMarker: "selector-shot.test.js",
+    maxPerTest: 1
+  });
+
+  const page = {
+    locator(selector) {
+      return {
+        first() {
+          return {
+            async waitFor() { },
+            async scrollIntoViewIfNeeded() { },
+            async screenshot({ path: imagePath }) {
+              fs.writeFileSync(imagePath, `mock image for ${selector}`, "utf8");
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const testInfo = {
+    title: "max per test",
+    project: { name: "chromium" }
+  };
+
+  await hooks.beforeEach({ page }, testInfo);
+  page.locator("#first-limited");
+  page.locator("#second-limited");
+  await hooks.afterEach({ page }, testInfo);
+
+  const allFiles = fs.readdirSync(outDir, { recursive: true });
+  const jsonFiles = allFiles.filter((name) => String(name).endsWith(".json"));
+  assert.equal(jsonFiles.length, 1);
+
+  const meta = JSON.parse(fs.readFileSync(path.join(outDir, jsonFiles[0]), "utf8"));
+  assert.equal(meta.selector, "#first-limited");
+});
+
+test("selectorShot does not capture the same selector twice in hybrid mode", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  const hooks = selectorShot({
+    outDir,
+    selectorMarker: "selector-shot.test.js",
+    captureStrategy: "hybrid"
+  });
+
+  const page = {
+    locator(selector) {
+      return {
+        async fill() { },
+        first() {
+          return {
+            async waitFor() { },
+            async scrollIntoViewIfNeeded() { },
+            async screenshot({ path: imagePath }) {
+              fs.writeFileSync(imagePath, `mock image for ${selector}`, "utf8");
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const testInfo = {
+    title: "hybrid dedupe",
+    project: { name: "chromium" }
+  };
+
+  await hooks.beforeEach({ page }, testInfo);
+  await page.locator("#hybrid-target").fill("value");
+  await hooks.afterEach({ page }, testInfo);
+
+  const jsonFiles = fs.readdirSync(outDir, { recursive: true }).filter((name) => String(name).endsWith(".json"));
+  assert.equal(jsonFiles.length, 1);
+});
+
+test("selectorShot stops afterEach capture when the time budget is exhausted", async () => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-"));
+  const hooks = selectorShot({
+    outDir,
+    selectorMarker: "selector-shot.test.js",
+    maxAfterEachMs: 1,
+    debugCapture: true
+  });
+
+  const page = {
+    locator(selector) {
+      return {
+        first() {
+          return {
+            async waitFor() { },
+            async scrollIntoViewIfNeeded() { },
+            async screenshot({ path: imagePath }) {
+              await new Promise((resolve) => setTimeout(resolve, 5));
+              fs.writeFileSync(imagePath, `mock image for ${selector}`, "utf8");
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const testInfo = {
+    title: "afterEach budget",
+    project: { name: "chromium" }
+  };
+
+  await hooks.beforeEach({ page }, testInfo);
+  page.locator("#budget-one");
+  page.locator("#budget-two");
+  await hooks.afterEach({ page }, testInfo);
+
+  const allFiles = fs.readdirSync(outDir, { recursive: true });
+  const jsonFiles = allFiles.filter((name) => String(name).endsWith(".json") && !String(name).endsWith("_selector-shot-debug.json"));
+  const debugFile = allFiles.find((name) => String(name).endsWith("_selector-shot-debug.json"));
+  assert.equal(jsonFiles.length, 1);
+  assert.ok(debugFile);
+
+  const report = JSON.parse(fs.readFileSync(path.join(outDir, debugFile), "utf8"));
+  assert.equal(report.budgetExceeded, true);
+});

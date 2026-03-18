@@ -12,6 +12,8 @@
     "scripts":  {
                     "test":  "playwright test",
                     "test:unit":  "node --test packages/playwright-selector-shot/test/*.test.js",
+                    "test:extension:unit":  "npm -w selector-shot-vscode-extension run test:unit",
+                    "test:all":  "npm run test:unit && npm run test:extension:unit",
                     "build":  "npm -w selector-shot-vscode-extension run build",
                     "watch":  "npm -w selector-shot-vscode-extension run watch",
                     "test:extension":  "npm -w selector-shot-vscode-extension run test:integration",

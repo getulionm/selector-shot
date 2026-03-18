@@ -8,6 +8,26 @@ function safeName(input) {
   return String(input).replace(/[^a-zA-Z0-9-_]+/g, "_").slice(0, 80) || "item";
 }
 
+function normalizeStackFilePath(filePath) {
+  if (!filePath) {
+    return filePath;
+  }
+
+  let normalized = String(filePath).trim();
+  if (normalized.startsWith("async ")) {
+    normalized = normalized.slice("async ".length).trim();
+  }
+  if (normalized.startsWith("file://")) {
+    try {
+      normalized = new URL(normalized).pathname;
+    } catch {
+      // Leave the original string in place if URL parsing fails.
+    }
+  }
+
+  return normalized;
+}
+
 function parseCallsite(stack, options = {}) {
   if (!stack) {
     return null;
@@ -27,7 +47,8 @@ function parseCallsite(stack, options = {}) {
       continue;
     }
 
-    const [, filePath, lineNumber, columnNumber] = match;
+    const [, rawFilePath, lineNumber, columnNumber] = match;
+    const filePath = normalizeStackFilePath(rawFilePath);
     if (!filePath || filePath.startsWith("node:")) {
       continue;
     }
@@ -97,7 +118,8 @@ function readBool(value, fallback = false) {
 }
 
 async function captureSelectorScreenshot(page, selector, imagePath, options) {
-  const locator = page.locator(selector).first();
+  const locate = typeof options.locate === "function" ? options.locate : page.locator.bind(page);
+  const locator = locate(selector).first();
   let lastError = null;
   const startedAtMs = Date.now();
   const debug = {
@@ -207,6 +229,7 @@ function selectorShot(options = {}) {
 
     try {
       await captureSelectorScreenshot(page, item.selector, imagePath, {
+        locate: state.originalLocator,
         captureTimeoutMs: state.captureTimeoutMs,
         preCaptureWaitMs: state.preCaptureWaitMs,
         captureRetries: state.captureRetries,
