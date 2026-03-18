@@ -1,6 +1,6 @@
 {
   "name": "@getulionm/selector-shot-playwright",
-  "version": "0.0.1",
+  "version": "0.0.4",
   "description": "Capture selector screenshots and metadata from Playwright tests for Selector Shot.",
   "license": "MIT",
   "main": "index.js",

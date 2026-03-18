@@ -225,6 +225,8 @@ type BootstrapResult = {
   changedFiles: string[];
   notes: string[];
   installedDependency: boolean;
+  status: "success" | "partial" | "failed" | "noop";
+  summary: string;
 };
 
 function fileExists(filePath: string): boolean {
@@ -438,6 +440,10 @@ function specNeedsSetupImportPatch(contents: string): boolean {
   return names.includes("test");
 }
 
+function specImportsSelectorShotSetup(contents: string): boolean {
+  return /from\s*["'][^"']*setup\.selector-shot(?:\.[cm]?[jt]sx?)?["']/.test(contents);
+}
+
 function ensureSelectorShotDependency(
   workspaceRoot: string,
   packageJson?: { packageManager?: string | undefined }
@@ -450,16 +456,144 @@ function ensureSelectorShotDependency(
   if (result.status === 0) {
     return { installed: true };
   }
-  const detail = [result.stderr, result.stdout].map((s) => (s || "").trim()).filter(Boolean)[0];
+  const detail = [
+    result.error?.message,
+    result.stderr,
+    result.stdout
+  ]
+    .map((s) => (s || "").trim())
+    .filter(Boolean)[0];
   if (detail) {
     return {
       installed: false,
-      note: `Could not auto-install @getulionm/selector-shot-playwright. ${detail} Run ${installCommand.manualCommand}.`
+      note:
+        `Could not auto-install @getulionm/selector-shot-playwright ` +
+        `with "${installCommand.command} ${installCommand.args.join(" ")}". ${detail} ` +
+        `Run ${installCommand.manualCommand}.`
     };
   }
   return {
     installed: false,
-    note: `Could not auto-install @getulionm/selector-shot-playwright. Run ${installCommand.manualCommand}.`
+    note:
+      `Could not auto-install @getulionm/selector-shot-playwright ` +
+      `with "${installCommand.command} ${installCommand.args.join(" ")}". ` +
+      `Run ${installCommand.manualCommand}.`
+  };
+}
+
+function summarizePaths(filePaths: string[], workspaceRoot: string, max = 3): string {
+  const labels = filePaths
+    .slice(0, max)
+    .map((filePath) => path.relative(workspaceRoot, filePath).replace(/\\/g, "/"));
+  if (filePaths.length <= max) {
+    return labels.join(", ");
+  }
+  return `${labels.join(", ")} and ${filePaths.length - max} more`;
+}
+
+async function validateBootstrapWorkspace(
+  workspaceRoot: string,
+  dependencyMissing: boolean
+): Promise<{ errors: string[]; warnings: string[] }> {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const specUris = await vscode.workspace.findFiles("**/*.spec.{ts,tsx,js,jsx}", "**/node_modules/**");
+  const setupCandidates = [
+    path.join(workspaceRoot, "tests", "setup.selector-shot.ts"),
+    path.join(workspaceRoot, "tests", "setup.selector-shot.js")
+  ];
+  const hasSetupFile = setupCandidates.some((candidate) => fileExists(candidate));
+
+  const plainPlaywrightSpecs: string[] = [];
+  const customFixtureSpecs: string[] = [];
+  const setupImportSpecs: string[] = [];
+  for (const specUri of specUris) {
+    const specPath = specUri.fsPath;
+    const contents = fs.readFileSync(specPath, "utf8");
+    if (specNeedsSetupImportPatch(contents)) {
+      plainPlaywrightSpecs.push(specPath);
+    }
+    if (specImportsSelectorShotSetup(contents)) {
+      setupImportSpecs.push(specPath);
+    }
+    const fixtureImports = findCustomFixtureImportsInSpec(specPath, contents);
+    if (fixtureImports.length > 0) {
+      customFixtureSpecs.push(specPath);
+    }
+  }
+
+  if (dependencyMissing) {
+    errors.push("The Playwright helper package is still missing.");
+  }
+
+  if (plainPlaywrightSpecs.length > 0) {
+    errors.push(
+      `Some specs still import test directly from @playwright/test: ${summarizePaths(plainPlaywrightSpecs, workspaceRoot)}.`
+    );
+  }
+
+  if ((customFixtureSpecs.length > 0 || setupImportSpecs.length > 0) && !hasSetupFile) {
+    warnings.push(
+      "tests/setup.selector-shot.ts is missing."
+    );
+  }
+
+  return { errors, warnings };
+}
+
+function finalizeBootstrapResult(
+  workspaceRoot: string,
+  changedFiles: string[],
+  notes: string[],
+  installedDependency: boolean,
+  validation: { errors: string[]; warnings: string[] }
+): BootstrapResult {
+  const issues = [...notes, ...validation.errors, ...validation.warnings];
+  const hasFailure = validation.errors.length > 0;
+  const hasWarnings = notes.length > 0 || validation.warnings.length > 0;
+  const changedSummary = changedFiles.length > 0 ? `updated ${changedFiles.length} file(s)` : "updated 0 files";
+
+  if (hasFailure) {
+    return {
+      changedFiles,
+      notes: issues,
+      installedDependency,
+      status: "failed",
+      summary: `Selector Shot bootstrap failed: ${issues.join(" ")}`
+    };
+  }
+
+  if (hasWarnings) {
+    return {
+      changedFiles,
+      notes: issues,
+      installedDependency,
+      status: "partial",
+      summary:
+        `Selector Shot bootstrap is partial: ${changedSummary}. ` +
+        `${issues.join(" ")}`
+    };
+  }
+
+  if (changedFiles.length > 0 || installedDependency) {
+    return {
+      changedFiles,
+      notes: [],
+      installedDependency,
+      status: "success",
+      summary:
+        `Selector Shot bootstrap succeeded: ${changedSummary}` +
+        `${installedDependency ? ", installed the helper package," : ","} and wiring looks complete. ` +
+        `Run: npx selector-shot-update`
+    };
+  }
+
+  return {
+    changedFiles,
+    notes: [],
+    installedDependency,
+    status: "noop",
+    summary: "Selector Shot wiring already looks complete. Run: npx selector-shot-update"
   };
 }
 
@@ -469,7 +603,9 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     return {
       changedFiles: [],
       notes: ["No workspace folder is open, so bootstrap was skipped."],
-      installedDependency: false
+      installedDependency: false,
+      status: "failed",
+      summary: "Selector Shot bootstrap failed: no workspace folder is open."
     };
   }
 
@@ -479,7 +615,9 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     return {
       changedFiles: [],
       notes: ["No package.json found in workspace root, so auto-bootstrap was skipped."],
-      installedDependency: false
+      installedDependency: false,
+      status: "failed",
+      summary: "Selector Shot bootstrap failed: no package.json was found in the workspace root."
     };
   }
 
@@ -494,7 +632,9 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     return {
       changedFiles: [],
       notes: ["package.json could not be parsed, so auto-bootstrap was skipped."],
-      installedDependency: false
+      installedDependency: false,
+      status: "failed",
+      summary: "Selector Shot bootstrap failed: package.json could not be parsed."
     };
   }
 
@@ -520,6 +660,7 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
   const specUris = await vscode.workspace.findFiles("**/*.spec.{ts,tsx,js,jsx}", "**/node_modules/**");
   const fixtureCandidates = new Set<string>();
   const specsNeedingSetupPatch: string[] = [];
+  const specsReferencingSetupImport: string[] = [];
 
   for (const specUri of specUris) {
     const specPath = specUri.fsPath;
@@ -530,6 +671,9 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     }
     if (specNeedsSetupImportPatch(original)) {
       specsNeedingSetupPatch.push(specPath);
+    }
+    if (specImportsSelectorShotSetup(original)) {
+      specsReferencingSetupImport.push(specPath);
     }
   }
 
@@ -542,8 +686,10 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     }
   }
 
-  if (specsNeedingSetupPatch.length > 0) {
-    const hasTsSpec = specsNeedingSetupPatch.some((specPath) => specPath.endsWith(".ts") || specPath.endsWith(".tsx"));
+  const shouldEnsureSetupFile = specUris.length > 0;
+  if (shouldEnsureSetupFile) {
+    const setupRelevantSpecs = [...specsNeedingSetupPatch, ...specsReferencingSetupImport];
+    const hasTsSpec = setupRelevantSpecs.some((specPath) => specPath.endsWith(".ts") || specPath.endsWith(".tsx"));
     const setupExtension = hasTsSpec ? "ts" : "js";
     const setupPath = path.join(workspaceRoot, "tests", `setup.selector-shot.${setupExtension}`);
     if (!fileExists(setupPath)) {
@@ -586,11 +732,30 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
     changedFiles.push(packageJsonPath);
   }
 
-  return {
-    changedFiles,
-    notes,
+  const dependencyMissing = !Boolean(
+    packageJson.dependencies?.["@getulionm/selector-shot-playwright"] ||
+    packageJson.devDependencies?.["@getulionm/selector-shot-playwright"] ||
     installedDependency
-  };
+  );
+  const validation = await validateBootstrapWorkspace(workspaceRoot, dependencyMissing);
+  return finalizeBootstrapResult(workspaceRoot, changedFiles, notes, installedDependency, validation);
+}
+
+function showBootstrapResult(
+  bootstrap: BootstrapResult,
+  action: "setup" | "enable"
+) {
+  const prefix = action === "enable" ? "Selector Shot enable" : "Selector Shot setup";
+  const message = bootstrap.summary.replace(/^Selector Shot bootstrap/, prefix);
+  if (bootstrap.status === "failed") {
+    void vscode.window.showErrorMessage(message);
+    return;
+  }
+  if (bootstrap.status === "partial") {
+    void vscode.window.showWarningMessage(message);
+    return;
+  }
+  void vscode.window.showInformationMessage(message);
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -640,29 +805,13 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand("selectorShot.setup", async () => {
       const bootstrap = await bootstrapWorkspace();
-      for (const note of bootstrap.notes) {
-        void vscode.window.showWarningMessage(note);
-      }
-      if (bootstrap.changedFiles.length > 0 || bootstrap.installedDependency) {
-        vscode.window.showInformationMessage(`Selector Shot setup applied to ${bootstrap.changedFiles.length} file(s).`);
-        return;
-      }
-      vscode.window.showInformationMessage("Selector Shot setup found no required changes.");
+      showBootstrapResult(bootstrap, "setup");
     }),
     vscode.commands.registerCommand("selectorShot.enable", async () => {
       const bootstrap = await bootstrapWorkspace();
       await vscode.workspace.getConfiguration("selectorShot").update("enabled", true, vscode.ConfigurationTarget.Workspace);
       await provider.refreshIndex();
-      for (const note of bootstrap.notes) {
-        void vscode.window.showWarningMessage(note);
-      }
-      if (bootstrap.changedFiles.length > 0 || bootstrap.installedDependency) {
-        vscode.window.showInformationMessage(
-          `Selector Shot enabled. Bootstrap applied to ${bootstrap.changedFiles.length} file(s).`
-        );
-        return;
-      }
-      vscode.window.showInformationMessage("Selector Shot enabled for this workspace.");
+      showBootstrapResult(bootstrap, "enable");
     }),
     vscode.commands.registerCommand("selectorShot.disable", async () => {
       await vscode.workspace

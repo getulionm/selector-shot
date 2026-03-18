@@ -13,14 +13,14 @@ Shows `Open selector screenshot` CodeLens above source lines that have:
 npm -w selector-shot-vscode-extension run package
 ```
 2. In VS Code: Extensions -> `...` -> `Install from VSIX...`
-3. Select `packages/vscode-extension/selector-shot-vscode-extension-0.0.1.vsix`
+3. Select `packages/vscode-extension/selector-shot-vscode-extension-0.0.4.vsix`
 
 ## Client Setup (Recommended)
 
 In the client repo:
 1. Install this extension from VSIX (or Marketplace).
 2. Open the app or package folder you want to work in.
-2. Run command: `Selector Shot: Setup Project`
+2. Run command: `Selector Shot: Setup Project (Validate Wiring)`
 3. Run:
 ```bash
 npx selector-shot-update
@@ -38,7 +38,7 @@ npx selector-shot-update npm run test:e2e
 - updates spec imports to use the setup file for `test`
 - adds `test:selector-shot-update` script to `package.json` if missing
 
-`Selector Shot: Enable` remains available as a workspace toggle.
+`Selector Shot: Enable And Validate` remains available as the workspace toggle plus bootstrap gate.
 
 ## Recommended Workspace Model
 
@@ -73,8 +73,8 @@ Example:
 
 - `Selector Shot: Refresh Index`
 - `Selector Shot: Open Screenshot`
-- `Selector Shot: Setup Project`
-- `Selector Shot: Enable`
+- `Selector Shot: Setup Project (Validate Wiring)`
+- `Selector Shot: Enable And Validate`
 - `Selector Shot: Disable`
 
 The extension also auto-refreshes when selector-shot metadata files change, and when VS Code regains focus or active editor changes.
@@ -99,9 +99,9 @@ No CodeLens:
 4. Verify the target source line contains a concrete selector expression (literal or member reference like `selectors.firstName`).
 5. Check `Output` -> `Log (Extension Host)` for runtime errors.
 
-`Selector Shot: Setup Project` warns that `@getulionm/selector-shot-playwright` could not be auto-installed:
-1. This is expected until `@getulionm/selector-shot-playwright` is published.
-2. For local testing, install the helper package manually.
+`Selector Shot: Setup Project (Validate Wiring)` warns that `@getulionm/selector-shot-playwright` could not be auto-installed:
+1. Read the full command and Windows error text in the warning.
+2. Run the suggested install command manually if needed.
 3. Re-run `npx selector-shot-update`.
 
 `Selector screenshot not found on disk`:
