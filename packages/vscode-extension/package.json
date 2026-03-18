@@ -2,7 +2,7 @@
     "name": "selector-shot-vscode-extension",
     "displayName": "Selector Shot",
     "description": "Show selector screenshots on CodeLens",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "publisher": "getulionm",
     "engines": {
         "vscode": "^1.90.0"
