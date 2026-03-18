@@ -1,5 +1,5 @@
 import { test } from "@playwright/test";
-import { installSelectorShot } from "@selector-shot/playwright";
+import { installSelectorShot } from "@getulionm/selector-shot-playwright";
 
 if (process.env.SELECTOR_SHOT_CAPTURE === "1") {
   installSelectorShot(test, {

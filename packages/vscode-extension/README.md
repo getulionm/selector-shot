@@ -32,7 +32,7 @@ npx selector-shot-update npm run test:e2e
 ```
 
 `Selector Shot: Setup Project` performs bootstrap automatically:
-- installs `@selector-shot/playwright` as a dev dependency when missing
+- installs `@getulionm/selector-shot-playwright` as a dev dependency when missing
 - auto-wires existing custom Playwright fixture files imported by specs (`base.extend(...)`)
 - creates `tests/setup.selector-shot.ts` (or `.js` if no TypeScript specs are found)
 - updates spec imports to use the setup file for `test`
@@ -99,8 +99,8 @@ No CodeLens:
 4. Verify the target source line contains a concrete selector expression (literal or member reference like `selectors.firstName`).
 5. Check `Output` -> `Log (Extension Host)` for runtime errors.
 
-`Selector Shot: Setup Project` warns that `@selector-shot/playwright` could not be auto-installed:
-1. This is expected until `@selector-shot/playwright` is published.
+`Selector Shot: Setup Project` warns that `@getulionm/selector-shot-playwright` could not be auto-installed:
+1. This is expected until `@getulionm/selector-shot-playwright` is published.
 2. For local testing, install the helper package manually.
 3. Re-run `npx selector-shot-update`.
 

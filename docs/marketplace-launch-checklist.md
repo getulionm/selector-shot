@@ -50,5 +50,5 @@ Validate these option combinations in the Playwright helper package:
 ## 5. Release metadata
 
 - Replace placeholder publisher metadata in [packages/vscode-extension/package.json](/c:/Users/getul/Documents/Projects/selector-shot/packages/vscode-extension/package.json)
-- Publish `@selector-shot/playwright` so `Selector Shot: Setup Project` can auto-install the helper package successfully
+- Publish `@getulionm/selector-shot-playwright` so `Selector Shot: Setup Project` can auto-install the helper package successfully
 - Confirm README install instructions mention Marketplace once the listing exists

@@ -9,7 +9,7 @@ Under the hood, this repo also includes a helper package used by client test run
 ## This repo contains
 
 - `packages/playwright-selector-shot`
-  - npm package: `@selector-shot/playwright`
+  - npm package: `@getulionm/selector-shot-playwright`
   - records `page.locator(...)` callsite metadata
   - captures screenshots and writes `.selector-shot/**/*.json`
 - `packages/vscode-extension`

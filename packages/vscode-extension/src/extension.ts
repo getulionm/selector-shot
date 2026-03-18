@@ -289,8 +289,8 @@ function patchPlaywrightSpecImports(contents: string, setupImportPath: string): 
 
 function patchCustomFixtureFile(contents: string): string {
   const hasInstallImport =
-    contents.includes("from \"@selector-shot/playwright\"") ||
-    contents.includes("from '@selector-shot/playwright'");
+    contents.includes("from \"@getulionm/selector-shot-playwright\"") ||
+    contents.includes("from '@getulionm/selector-shot-playwright'");
   const hasInstallCall = contents.includes("installSelectorShot(test");
 
   if (!contents.includes("base.extend")) {
@@ -317,7 +317,7 @@ function patchCustomFixtureFile(contents: string): string {
       }
       break;
     }
-    lines.splice(insertAt, 0, "import { installSelectorShot } from \"@selector-shot/playwright\";");
+    lines.splice(insertAt, 0, "import { installSelectorShot } from \"@getulionm/selector-shot-playwright\";");
     updated = lines.join("\n");
   }
 
@@ -435,7 +435,7 @@ function specNeedsSetupImportPatch(contents: string): boolean {
 
 function ensureSelectorShotDependency(workspaceRoot: string): { installed: boolean; note?: string } {
   const command = process.platform === "win32" ? "npm.cmd" : "npm";
-  const result = spawnSync(command, ["install", "-D", "@selector-shot/playwright"], {
+  const result = spawnSync(command, ["install", "-D", "@getulionm/selector-shot-playwright"], {
     cwd: workspaceRoot,
     encoding: "utf8"
   });
@@ -444,9 +444,12 @@ function ensureSelectorShotDependency(workspaceRoot: string): { installed: boole
   }
   const detail = [result.stderr, result.stdout].map((s) => (s || "").trim()).filter(Boolean)[0];
   if (detail) {
-    return { installed: false, note: `Could not auto-install @selector-shot/playwright. ${detail}` };
+    return { installed: false, note: `Could not auto-install @getulionm/selector-shot-playwright. ${detail}` };
   }
-  return { installed: false, note: "Could not auto-install @selector-shot/playwright. Run npm install -D @selector-shot/playwright." };
+  return {
+    installed: false,
+    note: "Could not auto-install @getulionm/selector-shot-playwright. Run npm install -D @getulionm/selector-shot-playwright."
+  };
 }
 
 async function bootstrapWorkspace(): Promise<BootstrapResult> {
@@ -492,8 +495,8 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
   }
 
   const hasSelectorShotDependency = Boolean(
-    packageJson.dependencies?.["@selector-shot/playwright"] ||
-    packageJson.devDependencies?.["@selector-shot/playwright"]
+    packageJson.dependencies?.["@getulionm/selector-shot-playwright"] ||
+    packageJson.devDependencies?.["@getulionm/selector-shot-playwright"]
   );
   if (!hasSelectorShotDependency) {
     const installResult = ensureSelectorShotDependency(workspaceRoot);
@@ -536,7 +539,7 @@ async function bootstrapWorkspace(): Promise<BootstrapResult> {
       fs.mkdirSync(path.dirname(setupPath), { recursive: true });
       const setupContents =
         "import { test } from \"@playwright/test\";\n" +
-        "import { installSelectorShot } from \"@selector-shot/playwright\";\n\n" +
+        "import { installSelectorShot } from \"@getulionm/selector-shot-playwright\";\n\n" +
         "if (process.env.SELECTOR_SHOT_CAPTURE === \"1\") {\n" +
         "  installSelectorShot(test, {\n" +
         "    outDir: \".selector-shot\",\n" +

@@ -1,14 +1,49 @@
 {
-    "name":  "@selector-shot/playwright",
-    "version":  "0.0.1",
-    "description":  "POC Playwright selector screenshot tracker",
-    "main":  "index.js",
-    "types":  "index.d.ts",
-    "scripts":  {
-                    "test":  "node --test test/*.test.js"
-                },
-    "license":  "MIT",
-    "bin":  {
-                "selector-shot-update":  "bin/selector-shot-update.js"
-            }
+  "name": "@getulionm/selector-shot-playwright",
+  "version": "0.0.1",
+  "description": "Capture selector screenshots and metadata from Playwright tests for Selector Shot.",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": "./index.js"
+  },
+  "bin": {
+    "selector-shot-update": "bin/selector-shot-update.js"
+  },
+  "files": [
+    "bin/",
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "pack:dry": "npm pack --dry-run"
+  },
+  "keywords": [
+    "playwright",
+    "testing",
+    "selectors",
+    "screenshots",
+    "vscode"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/getulionm/selector-shot.git",
+    "directory": "packages/playwright-selector-shot"
+  },
+  "homepage": "https://github.com/getulionm/selector-shot",
+  "bugs": {
+    "url": "https://github.com/getulionm/selector-shot/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.52.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }

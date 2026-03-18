@@ -7,7 +7,7 @@
                    ],
     "devDependencies":  {
                             "@playwright/test":  "^1.52.0",
-                            "@selector-shot/playwright":  "workspace:*"
+                            "@getulionm/selector-shot-playwright":  "workspace:*"
                         },
     "scripts":  {
                     "test":  "playwright test",
