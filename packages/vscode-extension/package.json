@@ -1,8 +1,8 @@
 {
     "name": "selector-shot-vscode-extension",
     "displayName": "Selector Shot: Playwright",
-    "description": "Show selector screenshots on CodeLens",
-    "version": "0.0.4",
+    "description": "Capture focused element screenshots from Playwright selectors and attach them to the calling code with CodeLens",
+    "version": "0.0.6",
     "publisher": "getulionm",
     "engines": {
         "vscode": "^1.90.0"
@@ -13,6 +13,7 @@
     "activationEvents": [
         "onStartupFinished",
         "onCommand:selectorShot.setup",
+        "onCommand:selectorShot.validate",
         "onCommand:selectorShot.refresh",
         "onCommand:selectorShot.openImage",
         "onCommand:selectorShot.enable",
@@ -23,7 +24,11 @@
         "commands": [
             {
                 "command": "selectorShot.setup",
-                "title": "Selector Shot: Setup Project (Validate Wiring)"
+                "title": "Selector Shot: Setup Project"
+            },
+            {
+                "command": "selectorShot.validate",
+                "title": "Selector Shot: Validate Wiring"
             },
             {
                 "command": "selectorShot.refresh",

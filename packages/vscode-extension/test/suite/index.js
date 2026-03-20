@@ -272,6 +272,35 @@ async function testSelectorVariableShowsLens(workspaceRoot, sourcePath, sourceUr
   );
 }
 
+async function testMalformedWindowsSourcePathStillShowsLens(workspaceRoot, sourcePath, sourceUri) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  const malformedPath = sourcePath.replace(/^([A-Za-z]:\\)/, "$1$1");
+  const malformedImage = await writeShot(
+    workspaceRoot,
+    "integration-run-malformed-windows-source",
+    malformedPath,
+    "#windows-esm-path",
+    "2026-02-26T00:00:06.500Z",
+    "captured",
+    SOURCE_LINE
+  );
+
+  await vscode.commands.executeCommand("selectorShot.refresh");
+
+  const lenses = await waitFor(async () => {
+    const current = await readCodeLens(sourceUri);
+    return hasLensForImage(current, malformedImage) ? current : null;
+  });
+
+  assert.ok(
+    hasLensForImage(lenses, malformedImage),
+    "Expected CodeLens to still appear when capture metadata contains a malformed Windows source path."
+  );
+}
+
 
 async function testDisableHidesLenses(workspaceRoot, sourcePath, sourceUri) {
   const disabledImage = await writeShot(
@@ -361,6 +390,7 @@ async function run() {
   await testSelectorMemberReferenceShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testStringLiteralSelectorShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testSelectorVariableShowsLens(workspaceRoot, sourcePath, sourceUri);
+  await testMalformedWindowsSourcePathStillShowsLens(workspaceRoot, sourcePath, sourceUri);
   await testDisableHidesLenses(workspaceRoot, sourcePath, sourceUri);
   await testCodeLensAcrossCommonPlaywrightLayouts(workspaceRoot);
 }

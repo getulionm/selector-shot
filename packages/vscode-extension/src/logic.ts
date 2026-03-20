@@ -58,6 +58,17 @@ export function formatCaptureTime(createdAt: string): string {
   });
 }
 
+export function normalizeCapturedSourcePath(filePath: string): string {
+  let normalized = path.normalize(String(filePath || ""));
+
+  if (process.platform === "win32") {
+    normalized = normalized.replace(/^[A-Za-z]:\\(?=[A-Za-z]:\\)/, "");
+    normalized = normalized.replace(/^\\([A-Za-z]:\\)/, "$1");
+  }
+
+  return normalized;
+}
+
 export function buildSelectorShotInstallCommand(
   workspaceRoot: string,
   packageJson?: { packageManager?: string | undefined }

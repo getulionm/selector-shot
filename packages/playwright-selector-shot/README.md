@@ -13,7 +13,7 @@ npm install -D @getulionm/selector-shot-playwright
 Create a shared setup file and install Selector Shot on Playwright's `test` object:
 
 ```ts
-import { test } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { installSelectorShot } from "@getulionm/selector-shot-playwright";
 
 if (process.env.SELECTOR_SHOT_CAPTURE === "1") {
@@ -22,10 +22,10 @@ if (process.env.SELECTOR_SHOT_CAPTURE === "1") {
   });
 }
 
-export { test };
+export { test, expect };
 ```
 
-Then import that `test` in your specs instead of importing `test` directly from `@playwright/test`.
+Then import `test` and `expect` from that shared setup file instead of importing them directly from `@playwright/test`.
 
 Run capture mode with:
 

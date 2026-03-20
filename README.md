@@ -1,10 +1,14 @@
 # selector-shot
 
-`selector-shot` is a VS Code extension that brings visibility to your Playwright selectors.
+Selector Shot helps teams see what their Playwright selectors are actually matching.
 
-It shows selector screenshots directly in source files via CodeLens, so you can understand what each selector matched during test execution.
+It captures focused screenshots from selector calls like `page.locator(...)` during test runs, writes capture metadata to `.selector-shot`, and the VS Code extension attaches that element visual back to the exact calling line with CodeLens.
 
-Under the hood, this repo also includes a helper package used by client test runs to capture selector metadata and images.
+That means QA and engineers can inspect selector results right where the code lives instead of bouncing between source, browser, and logs.
+
+![Selector Shot hero](docs/assets/hero-codelens.png)
+
+Selector Shot has two parts: the VS Code extension shows CodeLens, and the Playwright helper captures the selector metadata and screenshots those CodeLens use.
 
 ## This repo contains
 
@@ -13,7 +17,7 @@ Under the hood, this repo also includes a helper package used by client test run
   - records `page.locator(...)` callsite metadata
   - captures screenshots and writes `.selector-shot/**/*.json`
 - `packages/vscode-extension`
-  - VS Code extension package (`.vsix`)
+  - VS Code extension package
   - reads `.selector-shot` metadata
   - shows `Open selector screenshot` CodeLens
 
@@ -21,10 +25,10 @@ Under the hood, this repo also includes a helper package used by client test run
 
 In a client Playwright repo:
 
-1. Install the extension (VSIX or Marketplace).
+1. Install the extension from the VS Code Marketplace.
 2. Open the app or package folder you want to work in.
-2. Run command: `Selector Shot: Setup Project`.
-3. Run capture mode:
+3. Run command: `Selector Shot: Setup Project`.
+4. Run capture mode:
 
 ```bash
 npx selector-shot-update
@@ -36,21 +40,15 @@ If your test command is custom:
 npx selector-shot-update npm run test:e2e
 ```
 
-By default, Selector Shot writes capture output to `.selector-shot` in the current project folder. That same folder is also the default place the VS Code extension indexes, so the recommended workflow is:
-
-- standalone app: open the app root in VS Code and run capture there
-- monorepo package: open the package folder in VS Code and run capture there
-
-This keeps `selectorShot.dataGlob` at its default:
-
-```json
-{
-  "selectorShot.dataGlob": ".selector-shot/**/*.json"
-}
-```
-
 Extension-specific install details and commands are documented in:
 - [packages/vscode-extension/README.md](/c:/Users/getul/Documents/Projects/selector-shot/packages/vscode-extension/README.md)
+
+Workspace note: Selector Shot works best when VS Code is opened at the same app or package folder where `npx selector-shot-update` runs. In that common setup, the default `selectorShot.dataGlob` value of `.selector-shot/**/*.json` usually needs no changes.
+
+## Roadmap
+
+- Chain-aware locator captures: support locator-transforming chains so Selector Shot can safely attach visuals for `.first()`, `.last()`, `.nth()`, and then expand to `.filter()` plus chained `.locator()`. This work includes storing chain metadata instead of only the base selector and adding regressions to prove `first` and `nth` produce different captures.
+- Accessibility selectors: add support for Playwright accessibility-first selectors such as `getByRole`, `getByLabel`, `getByText`, `getByTestId`, and related patterns.
 
 ## Develop in this repo
 
@@ -64,12 +62,6 @@ Build extension bundle:
 
 ```bash
 npm run build
-```
-
-Package extension VSIX:
-
-```bash
-npm -w selector-shot-vscode-extension run package
 ```
 
 Run Playwright package unit tests:

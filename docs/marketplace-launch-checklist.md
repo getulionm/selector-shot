@@ -10,6 +10,7 @@ Use this before publishing a VSIX or Marketplace update so we test the extension
 - Install the produced `.vsix` into a clean VS Code profile and confirm:
   - the extension activates on startup
   - `Selector Shot: Setup Project` is available
+  - `Selector Shot: Validate Wiring` is available
   - `Selector Shot: Refresh Index` and `Selector Shot: Open Screenshot` work
 
 ## 2. Configuration matrix
@@ -42,6 +43,7 @@ Validate these option combinations in the Playwright helper package:
 ## 4. Manual smoke pass
 
 - Run `Selector Shot: Setup Project` in a sample repo and inspect generated edits
+- Run `Selector Shot: Validate Wiring` and confirm it stays read-only
 - Execute `npx selector-shot-update`
 - Confirm `.selector-shot/**/*.json` and PNG files are written
 - Open a spec file and verify CodeLens titles match success and failure states

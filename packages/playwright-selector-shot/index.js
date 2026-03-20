@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { fileURLToPath } = require("node:url");
 
 const LOCATOR_CALLSITE_RE = /\((.+):(\d+):(\d+)\)$/;
 const LOCATOR_CALLSITE_ALT_RE = /at (.+):(\d+):(\d+)$/;
@@ -19,7 +20,7 @@ function normalizeStackFilePath(filePath) {
   }
   if (normalized.startsWith("file://")) {
     try {
-      normalized = new URL(normalized).pathname;
+      normalized = fileURLToPath(normalized);
     } catch {
       // Leave the original string in place if URL parsing fails.
     }

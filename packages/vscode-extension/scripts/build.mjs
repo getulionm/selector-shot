@@ -3,7 +3,7 @@ import { build, context } from "esbuild";
 const watch = process.argv.includes("--watch");
 
 const options = {
-  entryPoints: ["src/extension.ts", "src/logic.ts"],
+  entryPoints: ["src/bootstrap.ts", "src/extension.ts", "src/logic.ts"],
   bundle: true,
   platform: "node",
   format: "cjs",

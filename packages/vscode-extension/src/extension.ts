@@ -1,13 +1,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { spawnSync } from "node:child_process";
 import * as vscode from "vscode";
 import {
-  buildSelectorShotInstallCommand,
   codeLensTitleForItem,
   formatCaptureTime,
-  lineContainsConcreteSelectorText
+  lineContainsConcreteSelectorText,
+  normalizeCapturedSourcePath
 } from "./logic";
+import {
+  type BootstrapResult,
+  bootstrapWorkspace as runBootstrapWorkspace,
+  validateWorkspace as runValidateWorkspace
+} from "./bootstrap";
 
 type SelectorShotMeta = {
   status?: string;
@@ -143,7 +147,7 @@ class SelectorShotLensProvider implements vscode.CodeLensProvider {
     return {
       selector: parsed.selector || "<unknown selector>",
       testTitle: parsed.testTitle || "<unknown test>",
-      sourcePath: parsed.source.filePath,
+      sourcePath: normalizeCapturedSourcePath(parsed.source.filePath),
       line: parsed.source.line,
       imagePath,
       createdAt: parsed.createdAt || "",
@@ -221,541 +225,56 @@ function lineContainsConcreteSelector(document: vscode.TextDocument, oneBasedLin
   return lineContainsConcreteSelectorText(text);
 }
 
-type BootstrapResult = {
-  changedFiles: string[];
-  notes: string[];
-  installedDependency: boolean;
-  status: "success" | "partial" | "failed" | "noop";
-  summary: string;
-};
-
-function fileExists(filePath: string): boolean {
-  try {
-    fs.accessSync(filePath, fs.constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function toImportPath(fromDir: string, targetFilePath: string): string {
-  const relative = path.relative(fromDir, targetFilePath).replace(/\\/g, "/");
-  const withoutExtension = relative.replace(/\.[cm]?[jt]sx?$/i, "");
-  if (withoutExtension.startsWith(".")) {
-    return withoutExtension;
-  }
-  return `./${withoutExtension}`;
-}
-
-function patchPlaywrightSpecImports(contents: string, setupImportPath: string): string {
-  if (
-    contents.includes(`from "${setupImportPath}"`) ||
-    contents.includes(`from '${setupImportPath}'`)
-  ) {
-    return contents;
-  }
-
-  const importRegex = /import\s*\{([\s\S]*?)\}\s*from\s*["']@playwright\/test["'];?/m;
-  const match = contents.match(importRegex);
-  if (!match) {
-    return contents;
-  }
-
-  const names = match[1]
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
-  if (!names.includes("test")) {
-    return contents;
-  }
-
-  const kept = names.filter((name) => name !== "test");
-  const rewrittenImport = kept.length > 0 ? `import { ${kept.join(", ")} } from "@playwright/test";` : "";
-  let updated = contents.replace(importRegex, rewrittenImport);
-
-  const setupImport = `import { test } from "${setupImportPath}";`;
-  const lines = updated.split(/\r?\n/);
-  let insertAt = 0;
-  for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i].trim();
-    if (line.startsWith("import ")) {
-      insertAt = i + 1;
-      continue;
-    }
-    if (line === "" && insertAt > 0) {
-      insertAt = i + 1;
-      continue;
-    }
-    break;
-  }
-  lines.splice(insertAt, 0, setupImport);
-  updated = lines.join("\n");
-
-  return updated.replace(/\n{3,}/g, "\n\n");
-}
-
-function patchCustomFixtureFile(contents: string): string {
-  const hasInstallImport =
-    contents.includes("from \"@getulionm/selector-shot-playwright\"") ||
-    contents.includes("from '@getulionm/selector-shot-playwright'");
-  const hasInstallCall = contents.includes("installSelectorShot(test");
-
-  if (!contents.includes("base.extend")) {
-    return contents;
-  }
-  if (!contents.includes("export const test")) {
-    return contents;
-  }
-
-  let updated = contents;
-
-  if (!hasInstallImport) {
-    const lines = updated.split(/\r?\n/);
-    let insertAt = 0;
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i].trim();
-      if (line.startsWith("import ")) {
-        insertAt = i + 1;
-        continue;
-      }
-      if (line === "" && insertAt > 0) {
-        insertAt = i + 1;
-        continue;
-      }
-      break;
-    }
-    lines.splice(insertAt, 0, "import { installSelectorShot } from \"@getulionm/selector-shot-playwright\";");
-    updated = lines.join("\n");
-  }
-
-  if (hasInstallCall) {
-    const installCallRegex = /installSelectorShot\(test,\s*\{([\s\S]*?)\}\s*\);/m;
-    const installMatch = updated.match(installCallRegex);
-    if (!installMatch) {
-      return updated;
-    }
-
-    let optionsBlock = installMatch[1];
-    const ensureOption = (key, value) => {
-      const keyRegex = new RegExp(`\\b${key}\\s*:`);
-      if (!keyRegex.test(optionsBlock)) {
-        optionsBlock = `${optionsBlock.trimEnd()}\n    ${key}: ${value},`;
-      }
-    };
-
-    ensureOption("captureStrategy", "\"onUse\"");
-    ensureOption("skipMissingSelectors", "true");
-    ensureOption("missingSelectorTimeoutMs", "1200");
-    ensureOption("captureAssertions", "true");
-
-    const replacement = `installSelectorShot(test, {\n${optionsBlock}\n  });`;
-    updated = updated.replace(installCallRegex, replacement);
-    return updated.replace(/\n{3,}/g, "\n\n");
-  }
-
-  const testAssignmentRegex = /export\s+const\s+test\s*=\s*base\.extend[\s\S]*?\n\}\);/m;
-  const match = updated.match(testAssignmentRegex);
-  if (!match) {
-    return updated;
-  }
-
-  const installBlock =
-    "\n\nif (process.env.SELECTOR_SHOT_CAPTURE === \"1\") {\n" +
-    "  installSelectorShot(test, {\n" +
-    "    outDir: \".selector-shot\",\n" +
-    "    maxPerTest: 60,\n" +
-    "    captureTimeoutMs: 2500,\n" +
-    "    preCaptureWaitMs: 750,\n" +
-    "    captureRetries: 0,\n" +
-    "    maxAfterEachMs: 8000,\n" +
-    "    captureStrategy: \"onUse\",\n" +
-    "    skipMissingSelectors: true,\n" +
-    "    missingSelectorTimeoutMs: 1200,\n" +
-    "    captureAssertions: true\n" +
-    "  });\n" +
-    "}";
-
-  const start = match.index || 0;
-  const end = start + match[0].length;
-  updated = `${updated.slice(0, end)}${installBlock}${updated.slice(end)}`;
-  return updated.replace(/\n{3,}/g, "\n\n");
-}
-
-function resolveImportToFile(specPath: string, importPath: string): string | undefined {
-  const baseDir = path.dirname(specPath);
-  const resolvedBase = path.resolve(baseDir, importPath);
-  const candidates = [
-    resolvedBase,
-    `${resolvedBase}.ts`,
-    `${resolvedBase}.tsx`,
-    `${resolvedBase}.js`,
-    `${resolvedBase}.jsx`,
-    path.join(resolvedBase, "index.ts"),
-    path.join(resolvedBase, "index.tsx"),
-    path.join(resolvedBase, "index.js"),
-    path.join(resolvedBase, "index.jsx")
-  ];
-  for (const candidate of candidates) {
-    if (fileExists(candidate)) {
-      return candidate;
-    }
-  }
-  return undefined;
-}
-
-function findCustomFixtureImportsInSpec(specPath: string, contents: string): string[] {
-  const results: string[] = [];
-  const importRegex = /import\s*\{([^}]*)\}\s*from\s*["']([^"']+)["'];?/g;
-  let match: RegExpExecArray | null = null;
-  while ((match = importRegex.exec(contents)) !== null) {
-    const names = match[1]
-      .split(",")
-      .map((name) => name.trim())
-      .filter(Boolean);
-    const source = match[2];
-    if (!names.includes("test")) {
-      continue;
-    }
-    if (!source || !source.startsWith(".")) {
-      continue;
-    }
-    const resolved = resolveImportToFile(specPath, source);
-    if (resolved) {
-      results.push(resolved);
-    }
-  }
-  return results;
-}
-
-function specNeedsSetupImportPatch(contents: string): boolean {
-  const importRegex = /import\s*\{([\s\S]*?)\}\s*from\s*["']@playwright\/test["'];?/m;
-  const match = contents.match(importRegex);
-  if (!match) {
-    return false;
-  }
-  const names = match[1]
-    .split(",")
-    .map((name) => name.trim())
-    .filter(Boolean);
-  return names.includes("test");
-}
-
-function specImportsSelectorShotSetup(contents: string): boolean {
-  return /from\s*["'][^"']*setup\.selector-shot(?:\.[cm]?[jt]sx?)?["']/.test(contents);
-}
-
-function ensureSelectorShotDependency(
-  workspaceRoot: string,
-  packageJson?: { packageManager?: string | undefined }
-): { installed: boolean; note?: string } {
-  const installCommand = buildSelectorShotInstallCommand(workspaceRoot, packageJson);
-  const result = spawnSync(installCommand.command, installCommand.args, {
-    cwd: workspaceRoot,
-    encoding: "utf8"
-  });
-  if (result.status === 0) {
-    return { installed: true };
-  }
-  const detail = [
-    result.error?.message,
-    result.stderr,
-    result.stdout
-  ]
-    .map((s) => (s || "").trim())
-    .filter(Boolean)[0];
-  if (detail) {
-    return {
-      installed: false,
-      note:
-        `Could not auto-install @getulionm/selector-shot-playwright ` +
-        `with "${installCommand.command} ${installCommand.args.join(" ")}". ${detail} ` +
-        `Run ${installCommand.manualCommand}.`
-    };
-  }
-  return {
-    installed: false,
-    note:
-      `Could not auto-install @getulionm/selector-shot-playwright ` +
-      `with "${installCommand.command} ${installCommand.args.join(" ")}". ` +
-      `Run ${installCommand.manualCommand}.`
-  };
-}
-
-function summarizePaths(filePaths: string[], workspaceRoot: string, max = 3): string {
-  const labels = filePaths
-    .slice(0, max)
-    .map((filePath) => path.relative(workspaceRoot, filePath).replace(/\\/g, "/"));
-  if (filePaths.length <= max) {
-    return labels.join(", ");
-  }
-  return `${labels.join(", ")} and ${filePaths.length - max} more`;
-}
-
-async function validateBootstrapWorkspace(
-  workspaceRoot: string,
-  dependencyMissing: boolean
-): Promise<{ errors: string[]; warnings: string[] }> {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-  const specUris = await vscode.workspace.findFiles("**/*.spec.{ts,tsx,js,jsx}", "**/node_modules/**");
-  const setupCandidates = [
-    path.join(workspaceRoot, "tests", "setup.selector-shot.ts"),
-    path.join(workspaceRoot, "tests", "setup.selector-shot.js")
-  ];
-  const hasSetupFile = setupCandidates.some((candidate) => fileExists(candidate));
-
-  const plainPlaywrightSpecs: string[] = [];
-  const customFixtureSpecs: string[] = [];
-  const setupImportSpecs: string[] = [];
-  for (const specUri of specUris) {
-    const specPath = specUri.fsPath;
-    const contents = fs.readFileSync(specPath, "utf8");
-    if (specNeedsSetupImportPatch(contents)) {
-      plainPlaywrightSpecs.push(specPath);
-    }
-    if (specImportsSelectorShotSetup(contents)) {
-      setupImportSpecs.push(specPath);
-    }
-    const fixtureImports = findCustomFixtureImportsInSpec(specPath, contents);
-    if (fixtureImports.length > 0) {
-      customFixtureSpecs.push(specPath);
-    }
-  }
-
-  if (dependencyMissing) {
-    errors.push("The Playwright helper package is still missing.");
-  }
-
-  if (plainPlaywrightSpecs.length > 0) {
-    errors.push(
-      `Some specs still import test directly from @playwright/test: ${summarizePaths(plainPlaywrightSpecs, workspaceRoot)}.`
-    );
-  }
-
-  if ((customFixtureSpecs.length > 0 || setupImportSpecs.length > 0) && !hasSetupFile) {
-    warnings.push(
-      "tests/setup.selector-shot.ts is missing."
-    );
-  }
-
-  return { errors, warnings };
-}
-
-function finalizeBootstrapResult(
-  workspaceRoot: string,
-  changedFiles: string[],
-  notes: string[],
-  installedDependency: boolean,
-  validation: { errors: string[]; warnings: string[] }
-): BootstrapResult {
-  const issues = [...notes, ...validation.errors, ...validation.warnings];
-  const hasFailure = validation.errors.length > 0;
-  const hasWarnings = notes.length > 0 || validation.warnings.length > 0;
-  const changedSummary = changedFiles.length > 0 ? `updated ${changedFiles.length} file(s)` : "updated 0 files";
-
-  if (hasFailure) {
-    return {
-      changedFiles,
-      notes: issues,
-      installedDependency,
-      status: "failed",
-      summary: `Selector Shot bootstrap failed: ${issues.join(" ")}`
-    };
-  }
-
-  if (hasWarnings) {
-    return {
-      changedFiles,
-      notes: issues,
-      installedDependency,
-      status: "partial",
-      summary:
-        `Selector Shot bootstrap is partial: ${changedSummary}. ` +
-        `${issues.join(" ")}`
-    };
-  }
-
-  if (changedFiles.length > 0 || installedDependency) {
-    return {
-      changedFiles,
-      notes: [],
-      installedDependency,
-      status: "success",
-      summary:
-        `Selector Shot bootstrap succeeded: ${changedSummary}` +
-        `${installedDependency ? ", installed the helper package," : ","} and wiring looks complete. ` +
-        `Run: npx selector-shot-update`
-    };
-  }
-
-  return {
-    changedFiles,
-    notes: [],
-    installedDependency,
-    status: "noop",
-    summary: "Selector Shot wiring already looks complete. Run: npx selector-shot-update"
-  };
-}
-
-async function bootstrapWorkspace(): Promise<BootstrapResult> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) {
-    return {
-      changedFiles: [],
-      notes: ["No workspace folder is open, so bootstrap was skipped."],
-      installedDependency: false,
-      status: "failed",
-      summary: "Selector Shot bootstrap failed: no workspace folder is open."
-    };
-  }
-
-  const workspaceRoot = folder.uri.fsPath;
-  const packageJsonPath = path.join(workspaceRoot, "package.json");
-  if (!fileExists(packageJsonPath)) {
-    return {
-      changedFiles: [],
-      notes: ["No package.json found in workspace root, so auto-bootstrap was skipped."],
-      installedDependency: false,
-      status: "failed",
-      summary: "Selector Shot bootstrap failed: no package.json was found in the workspace root."
-    };
-  }
-
-  const changedFiles: string[] = [];
-  const notes: string[] = [];
-  let installedDependency = false;
-
-  let packageJson: any;
-  try {
-    packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
-  } catch {
-    return {
-      changedFiles: [],
-      notes: ["package.json could not be parsed, so auto-bootstrap was skipped."],
-      installedDependency: false,
-      status: "failed",
-      summary: "Selector Shot bootstrap failed: package.json could not be parsed."
-    };
-  }
-
-  let packageJsonChanged = false;
-  packageJson.scripts = packageJson.scripts || {};
-  if (!packageJson.scripts["test:selector-shot-update"]) {
-    packageJson.scripts["test:selector-shot-update"] = "selector-shot-update";
-    packageJsonChanged = true;
-  }
-
-  const hasSelectorShotDependency = Boolean(
-    packageJson.dependencies?.["@getulionm/selector-shot-playwright"] ||
-    packageJson.devDependencies?.["@getulionm/selector-shot-playwright"]
-  );
-  if (!hasSelectorShotDependency) {
-    const installResult = ensureSelectorShotDependency(workspaceRoot, packageJson);
-    installedDependency = installResult.installed;
-    if (!installResult.installed && installResult.note) {
-      notes.push(installResult.note);
-    }
-  }
-
-  const specUris = await vscode.workspace.findFiles("**/*.spec.{ts,tsx,js,jsx}", "**/node_modules/**");
-  const fixtureCandidates = new Set<string>();
-  const specsNeedingSetupPatch: string[] = [];
-  const specsReferencingSetupImport: string[] = [];
-
-  for (const specUri of specUris) {
-    const specPath = specUri.fsPath;
-    const original = fs.readFileSync(specPath, "utf8");
-    const fixtureImports = findCustomFixtureImportsInSpec(specPath, original);
-    for (const fixturePath of fixtureImports) {
-      fixtureCandidates.add(fixturePath);
-    }
-    if (specNeedsSetupImportPatch(original)) {
-      specsNeedingSetupPatch.push(specPath);
-    }
-    if (specImportsSelectorShotSetup(original)) {
-      specsReferencingSetupImport.push(specPath);
-    }
-  }
-
-  for (const fixturePath of fixtureCandidates) {
-    const original = fs.readFileSync(fixturePath, "utf8");
-    const updated = patchCustomFixtureFile(original);
-    if (updated !== original) {
-      fs.writeFileSync(fixturePath, updated, "utf8");
-      changedFiles.push(fixturePath);
-    }
-  }
-
-  const shouldEnsureSetupFile = specUris.length > 0;
-  if (shouldEnsureSetupFile) {
-    const setupRelevantSpecs = [...specsNeedingSetupPatch, ...specsReferencingSetupImport];
-    const hasTsSpec = setupRelevantSpecs.some((specPath) => specPath.endsWith(".ts") || specPath.endsWith(".tsx"));
-    const setupExtension = hasTsSpec ? "ts" : "js";
-    const setupPath = path.join(workspaceRoot, "tests", `setup.selector-shot.${setupExtension}`);
-    if (!fileExists(setupPath)) {
-      fs.mkdirSync(path.dirname(setupPath), { recursive: true });
-      const setupContents =
-        "import { test } from \"@playwright/test\";\n" +
-        "import { installSelectorShot } from \"@getulionm/selector-shot-playwright\";\n\n" +
-        "if (process.env.SELECTOR_SHOT_CAPTURE === \"1\") {\n" +
-        "  installSelectorShot(test, {\n" +
-        "    outDir: \".selector-shot\",\n" +
-        "    maxPerTest: 60,\n" +
-        "    captureTimeoutMs: 2500,\n" +
-        "    preCaptureWaitMs: 750,\n" +
-        "    captureRetries: 0,\n" +
-        "    maxAfterEachMs: 8000,\n" +
-        "    captureStrategy: \"onUse\",\n" +
-        "    skipMissingSelectors: true,\n" +
-        "    missingSelectorTimeoutMs: 1200,\n" +
-        "    captureAssertions: true\n" +
-        "  });\n" +
-        "}\n\n" +
-        "export { test };\n";
-      fs.writeFileSync(setupPath, setupContents, "utf8");
-      changedFiles.push(setupPath);
-    }
-
-    for (const specPath of specsNeedingSetupPatch) {
-      const original = fs.readFileSync(specPath, "utf8");
-      const setupImportPath = toImportPath(path.dirname(specPath), setupPath);
-      const updated = patchPlaywrightSpecImports(original, setupImportPath);
-      if (updated !== original) {
-        fs.writeFileSync(specPath, updated, "utf8");
-        changedFiles.push(specPath);
-      }
-    }
-  }
-
-  if (packageJsonChanged) {
-    fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`, "utf8");
-    changedFiles.push(packageJsonPath);
-  }
-
-  const dependencyMissing = !Boolean(
-    packageJson.dependencies?.["@getulionm/selector-shot-playwright"] ||
-    packageJson.devDependencies?.["@getulionm/selector-shot-playwright"] ||
-    installedDependency
-  );
-  const validation = await validateBootstrapWorkspace(workspaceRoot, dependencyMissing);
-  return finalizeBootstrapResult(workspaceRoot, changedFiles, notes, installedDependency, validation);
-}
-
 function showBootstrapResult(
-  bootstrap: BootstrapResult,
-  action: "setup" | "enable"
+  bootstrap: BootstrapResult
 ) {
-  const prefix = action === "enable" ? "Selector Shot enable" : "Selector Shot setup";
-  const message = bootstrap.summary.replace(/^Selector Shot bootstrap/, prefix);
   if (bootstrap.status === "failed") {
-    void vscode.window.showErrorMessage(message);
+    void vscode.window.showErrorMessage(bootstrap.summary);
     return;
   }
   if (bootstrap.status === "partial") {
+    void vscode.window.showWarningMessage(bootstrap.summary);
+    return;
+  }
+  void vscode.window.showInformationMessage(bootstrap.summary);
+}
+
+function showValidationResult(
+  validation: { status: "complete" | "duplicate" | "broken"; summary: string },
+  action: "validate" | "enable"
+) {
+  const message = action === "enable"
+    ? `Selector Shot enabled for this workspace. ${validation.summary}`
+    : validation.summary;
+
+  if (validation.status === "broken") {
+    void vscode.window.showErrorMessage(message);
+    return;
+  }
+  if (validation.status === "duplicate") {
     void vscode.window.showWarningMessage(message);
     return;
   }
   void vscode.window.showInformationMessage(message);
+}
+
+function setupFailedWithoutWorkspace(): BootstrapResult {
+  return {
+    changedFiles: [],
+    notes: ["No workspace folder is open, so setup was skipped."],
+    installedDependency: false,
+    status: "failed",
+    summary: "Selector Shot setup failed: no workspace folder is open."
+  };
+}
+
+function validationFailedWithoutWorkspace() {
+  return {
+    status: "broken" as const,
+    errors: ["No workspace folder is open."],
+    warnings: [],
+    summary: "Selector Shot wiring is broken: no workspace folder is open."
+  };
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -804,14 +323,21 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.commands.registerCommand("selectorShot.setup", async () => {
-      const bootstrap = await bootstrapWorkspace();
-      showBootstrapResult(bootstrap, "setup");
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const bootstrap = workspaceRoot ? runBootstrapWorkspace(workspaceRoot) : setupFailedWithoutWorkspace();
+      showBootstrapResult(bootstrap);
+    }),
+    vscode.commands.registerCommand("selectorShot.validate", async () => {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const validation = workspaceRoot ? runValidateWorkspace(workspaceRoot) : validationFailedWithoutWorkspace();
+      showValidationResult(validation, "validate");
     }),
     vscode.commands.registerCommand("selectorShot.enable", async () => {
-      const bootstrap = await bootstrapWorkspace();
       await vscode.workspace.getConfiguration("selectorShot").update("enabled", true, vscode.ConfigurationTarget.Workspace);
       await provider.refreshIndex();
-      showBootstrapResult(bootstrap, "enable");
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const validation = workspaceRoot ? runValidateWorkspace(workspaceRoot) : validationFailedWithoutWorkspace();
+      showValidationResult(validation, "enable");
     }),
     vscode.commands.registerCommand("selectorShot.disable", async () => {
       await vscode.workspace

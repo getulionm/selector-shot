@@ -3,6 +3,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+const { pathToFileURL } = require("node:url");
 
 const { selectorShot, installSelectorShot, wireSelectorShot } = require("../index");
 
@@ -559,4 +561,56 @@ test("selectorShot stops afterEach capture when the time budget is exhausted", a
 
   const report = JSON.parse(fs.readFileSync(path.join(outDir, debugFile), "utf8"));
   assert.equal(report.budgetExceeded, true);
+});
+
+test("selectorShot records a valid Windows source path for ESM callsites", { skip: process.platform !== "win32" }, () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "selector-shot-esm-"));
+  const outDir = path.join(tempDir, ".selector-shot");
+  const scriptPath = path.join(tempDir, "capture.mjs");
+  const helperUrl = pathToFileURL(path.join(__dirname, "..", "index.js")).href;
+
+  fs.writeFileSync(
+    scriptPath,
+    [
+      `import helper from ${JSON.stringify(helperUrl)};`,
+      "const { selectorShot } = helper;",
+      `const hooks = selectorShot({ outDir: ${JSON.stringify(outDir)} });`,
+      "const page = {",
+      "  locator(selector) {",
+      "    return {",
+      "      first() {",
+      "        return {",
+      "          async waitFor() {},",
+      "          async scrollIntoViewIfNeeded() {},",
+      "          async screenshot({ path }) {",
+      "            const { writeFileSync } = await import('node:fs');",
+      "            writeFileSync(path, selector, 'utf8');",
+      "          }",
+      "        };",
+      "      }",
+      "    };",
+      "  }",
+      "};",
+      "const testInfo = { title: 'esm callsite', project: { name: 'chromium' } };",
+      "await hooks.beforeEach({ page }, testInfo);",
+      "page.locator('#email');",
+      "await hooks.afterEach({ page }, testInfo);"
+    ].join("\n"),
+    "utf8"
+  );
+
+  const result = spawnSync(process.execPath, [scriptPath], {
+    cwd: tempDir,
+    encoding: "utf8"
+  });
+
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+
+  const allFiles = fs.readdirSync(outDir, { recursive: true });
+  const jsonFile = allFiles.find((name) => String(name).endsWith(".json"));
+  assert.ok(jsonFile, "Expected one selector-shot JSON file.");
+
+  const meta = JSON.parse(fs.readFileSync(path.join(outDir, jsonFile), "utf8"));
+  assert.equal(meta.source.filePath.includes(":\\C:\\"), false);
+  assert.equal(path.isAbsolute(meta.source.filePath), true);
 });

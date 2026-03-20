@@ -8,7 +8,8 @@ const {
   buildSelectorShotInstallCommand,
   lineContainsConcreteSelectorText,
   codeLensTitleForItem,
-  formatCaptureTime
+  formatCaptureTime,
+  normalizeCapturedSourcePath
 } = require("../../dist/logic.js");
 
 test("matches selector object member references", () => {
@@ -44,6 +45,18 @@ test("success title includes open prefix and capture time", () => {
 
 test("formatCaptureTime returns fallback for empty value", () => {
   assert.equal(formatCaptureTime(""), "unknown time");
+});
+
+test("normalizes malformed Windows capture source paths", () => {
+  if (process.platform !== "win32") {
+    assert.equal(normalizeCapturedSourcePath("/tmp/example.spec.js"), path.normalize("/tmp/example.spec.js"));
+    return;
+  }
+
+  assert.equal(
+    normalizeCapturedSourcePath("C:\\C:\\Users\\getul\\project\\tests\\example.spec.js"),
+    path.normalize("C:\\Users\\getul\\project\\tests\\example.spec.js")
+  );
 });
 
 test("prefers packageManager field when choosing install command", () => {
