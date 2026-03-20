@@ -4,7 +4,7 @@ Selector Shot captures focused screenshots from Playwright selectors like `page.
 
 It is built for QA and engineering workflows where you want to inspect what a selector matched without leaving the test file.
 
-![Selector Shot hero](https://raw.githubusercontent.com/getulionm/selector-shot/main/packages/vscode-extension/media/hero-codelens.png)
+![Selector Shot hero](media/hero-codelens.png)
 
 ## What You Get
 
