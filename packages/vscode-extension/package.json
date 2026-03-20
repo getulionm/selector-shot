@@ -2,8 +2,9 @@
     "name": "selector-shot-vscode-extension",
     "displayName": "Selector Shot: Playwright",
     "description": "Capture focused element screenshots from Playwright selectors and attach them to the calling code with CodeLens",
-    "version": "0.0.6",
+    "version": "0.0.7",
     "publisher": "getulionm",
+    "icon": "media/icon.png",
     "engines": {
         "vscode": "^1.90.0"
     },
