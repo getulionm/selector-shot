@@ -24,6 +24,9 @@ It is built for QA and engineering workflows where you want to inspect what a se
 
 Install `Selector Shot: Playwright` from the VS Code Marketplace.
 
+Marketplace identifier:
+- `getulionm.selector-shot-vscode-extension`
+
 ## Client Setup (Recommended)
 
 In the client repo:
@@ -39,6 +42,11 @@ npx selector-shot-update
 If your test command is not `npm test`, pass it explicitly:
 ```bash
 npx selector-shot-update npm run test:e2e
+```
+
+If helper auto-install is blocked in your environment, install it manually:
+```bash
+npm install -D @getulionm/selector-shot-playwright
 ```
 
 `Selector Shot: Setup Project` performs bootstrap automatically:

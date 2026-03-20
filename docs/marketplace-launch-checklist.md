@@ -1,6 +1,6 @@
 # Selector Shot Marketplace Launch Checklist
 
-Use this before publishing a VSIX or Marketplace update so we test the extension the way real teams will install and use it.
+Use this before publishing a Marketplace update so we test the extension the way real teams will install and use it.
 
 ## 1. Packaging and basic install
 
@@ -51,6 +51,6 @@ Validate these option combinations in the Playwright helper package:
 
 ## 5. Release metadata
 
-- Replace placeholder publisher metadata in [packages/vscode-extension/package.json](/c:/Users/getul/Documents/Projects/selector-shot/packages/vscode-extension/package.json)
-- Publish `@getulionm/selector-shot-playwright` so `Selector Shot: Setup Project` can auto-install the helper package successfully
-- Confirm README install instructions mention Marketplace once the listing exists
+- Confirm publisher metadata in [packages/vscode-extension/package.json](/c:/Users/getul/Documents/Projects/selector-shot/packages/vscode-extension/package.json) still matches the live listing
+- Confirm `@getulionm/selector-shot-playwright` is already published so `Selector Shot: Setup Project` can auto-install the helper package successfully
+- Confirm README install instructions mention the live Marketplace listing and published npm package name

@@ -25,7 +25,8 @@ Selector Shot has two parts: the VS Code extension shows CodeLens, and the Playw
 
 In a client Playwright repo:
 
-1. Install the extension from the VS Code Marketplace.
+1. Install `Selector Shot: Playwright` from the VS Code Marketplace:
+   `getulionm.selector-shot-vscode-extension`
 2. Open the app or package folder you want to work in.
 3. Run command: `Selector Shot: Setup Project`.
 4. Run capture mode:
@@ -38,6 +39,12 @@ If your test command is custom:
 
 ```bash
 npx selector-shot-update npm run test:e2e
+```
+
+Manual helper install is available if needed:
+
+```bash
+npm install -D @getulionm/selector-shot-playwright
 ```
 
 Extension-specific install details and commands are documented in:

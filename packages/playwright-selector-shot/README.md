@@ -2,6 +2,9 @@
 
 `@getulionm/selector-shot-playwright` captures selector screenshots and callsite metadata from Playwright tests so the Selector Shot VS Code extension can show CodeLens previews in source files.
 
+VS Code extension:
+- `getulionm.selector-shot-vscode-extension`
+
 ## Install
 
 ```bash
